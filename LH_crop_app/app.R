@@ -2,6 +2,7 @@ library(shiny)
 library(tidyverse)
 library(scico)
 library(tigris)
+library(showtext)
 library(plotly)
 
 
@@ -61,8 +62,6 @@ server <- function(input, output, session) {
   Rpalette <- reactive(input$paltt)
   Rseason <- reactive(input$szn)
   Rfwrap <- reactive(input$f_wrap)
-  
-  radius <- server_data[[Rprod]]/max(server_data[[Rprod]]) * 30000
   
   # create map
     output$map <- renderPlotly({
