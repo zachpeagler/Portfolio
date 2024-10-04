@@ -9,7 +9,7 @@ library(sf)
 library(ggthemes)
 
 # load data
-LH_state_file <- "C:/Users/zachp/OneDrive/Documents/GitHub/Portfolio/US State Family Farm Products/LH_state.shp"
+LH_state_file <- "LH_state.shp"
 LH_state <- st_read(LH_state_file)
 
 # graphical setup
