@@ -7,6 +7,7 @@ library(scico)
 library(showtext)
 library(sf)
 library(ggthemes)
+library(ggspatial)
 
 # load data
 LH_state_file <- "LH_state.shp"
@@ -67,7 +68,7 @@ server <- function(input, output) {
     LH_season <- LH_state %>% filter(Season == Rseason())
     
     # generate plot
-    ggplot(LH_season, aes_string(fill=Rprod()))+
+    ggplot(LH_season, aes(fill=.data[[Rprod()]]))+
       geom_sf(color="black")+
       scale_fill_scico(begin=1, end=0, palette = gettext(Rpalette()))+
       guides(fill = guide_colorbar(title = Rprod()))+
