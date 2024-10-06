@@ -53,18 +53,19 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
       selectInput("product","Select Product",
-                  choices = cutprods, selected = "corn"),
+                  choices = crops, selected = "corn"),
       selectInput("palette","Select Palette",
                   choices = p_palettes, selected = "bilbao"),
       selectInput("fwrap", "Facet Wrap by Season",
-                  choices = c("TRUE, FALSE"), selected = "FALSE"),
+                  choices = c(TRUE, FALSE), selected = FALSE),
       conditionalPanel(condition = "input.fwrap == 'FALSE'",
                        selectInput("season", "Select Season",
                                    choices = seasons, selected = "Fall"))
     ), #-- end sidebar
     ### main panel with plot
     mainPanel(
-      plotOutput("map")
+      plotOutput("map"),
+      plotOutput("bar")
     ) #-- end mainpanel
   ) #-- end layout
 ) #-- end fluidpage
@@ -76,40 +77,75 @@ server <- function(input, output) {
   Rseason <- reactive({input$season})
   Rprod <- reactive({input$product})
   Rpalette <- reactive({input$palette})
+  Rfwrap <- reactive({input$fwrap})
   
   # create map
   output$map <- renderPlot({
     
     # filter the data to only be the selected season
-    LH_season <- LH_state %>% filter(Season == Rseason())
+    us_st_season <- us_st_prod %>% filter(Season == Rseason())
     
+    if (Rfwrap() == FALSE)
     # generate plot
-    ggplot(us_st_prod, aes(fill=.data[[Rprod()]]))+
-      geom_sf(color="black")+
-      scale_fill_scico(begin=1, end=0, palette = gettext(Rpalette()))+
-      guides(fill = guide_colorbar(title = Rprod()))+
-      labs(title=paste("Number of farms that produce", Rprod(), "by state", sep =" "),
-           subtitle="For family farms in the 48 continental United States",
-           caption="Data from localharvest (2024) and tigris (2022)")+
-      coord_sf(clip = "off") +
-      annotation_scale(location="bl", text_cex = 2, text_family = "mont")+
-      annotation_north_arrow(location="br", height=unit(0.5, "cm"), width=unit(0.5, "cm"))+
-      theme_map() +
-      theme(legend.position = "inside",
-            legend.position.inside = c(0,.1),
-            legend.title.position = "top",
-            legend.direction = "horizontal",
-            legend.title = element_text(size=20, family="open"),
-            strip.background = element_rect(fill=NA, color=NA),
-            text = element_text(size=24, family="mont"),
-            title = element_text(size=30, family="open", face="bold", lineheight = .5),
-            plot.subtitle = element_text(size=24, family="mont", face="italic", lineheight = .5),
-            plot.caption = element_text(size=20, family="mont", face="italic", lineheight = .5))
+      ggplot(us_st_season, aes(fill=.data[[Rprod()]]))+
+        geom_sf(color="black")+
+        scale_fill_scico(begin=1, end=0, palette = gettext(Rpalette()))+
+        guides(fill = guide_colorbar(title = Rprod()))+
+        labs(title=paste("Number of farms that produce", Rprod(), "by state", sep =" "),
+             subtitle="For family farms in the 48 continental United States",
+             caption="Data from localharvest (2024) and tigris (2022)")+
+        coord_sf(clip = "off") +
+        annotation_scale(location="bl", text_cex = 2, text_family = "mont")+
+        annotation_north_arrow(location="br", height=unit(0.5, "cm"), width=unit(0.5, "cm"))+
+        theme_map() +
+        theme(legend.position = "inside",
+              legend.position.inside = c(0,.1),
+              legend.title.position = "top",
+              legend.direction = "horizontal",
+              legend.title = element_text(size=20, family="open"),
+              strip.background = element_rect(fill=NA, color=NA),
+              text = element_text(size=24, family="mont"),
+              title = element_text(size=30, family="open", face="bold", lineheight = .5),
+              plot.subtitle = element_text(size=24, family="mont", face="italic", lineheight = .5),
+              plot.caption = element_text(size=20, family="mont", face="italic", lineheight = .5))
+    else
+      ggplot(us_st_prod, aes(fill=.data[[Rprod()]]))+
+        geom_sf(color="black")+
+        scale_fill_scico(begin=1, end=0, palette = gettext(Rpalette()))+
+        facet_wrap(~Season)+
+        guides(fill = guide_colorbar(title = Rprod()))+
+        labs(title=paste("Number of farms that produce", Rprod(), "by state", sep =" "),
+             subtitle="For family farms in the 48 continental United States",
+             caption="Data from localharvest (2024) and tigris (2022)")+
+        coord_sf(clip = "off") +
+        annotation_scale(location="bl", text_cex = 2, text_family = "mont")+
+        annotation_north_arrow(location="br", height=unit(0.5, "cm"), width=unit(0.5, "cm"))+
+        theme_map() +
+        theme(legend.position = "right",
+              legend.title.position = "top",
+              legend.title = element_text(size=20, family="open"),
+              strip.background = element_rect(fill=NA, color=NA),
+              text = element_text(size=24, family="mont"),
+              title = element_text(size=30, family="open", face="bold", lineheight = .5),
+              plot.subtitle = element_text(size=24, family="mont", face="italic", lineheight = .5),
+              plot.caption = element_text(size=20, family="mont", face="italic", lineheight = .5))
+      
   }) ## end map output
   
-  # create map
-  output$hist <- renderPlot({
+  # barplot
+  output$bar <- renderPlot({
     
+    # df to hold top producers
+    top_prod <- head(us_st_prod[order(Rprod()),] %>% filter(Season == Rseason()), n=10)
+    
+    # plot
+    ggplot(top_prod, aes(x=NAME, y=.data[[Rprod()]]))+
+      geom_col()+
+      scale_color_scico(begin=1, end=0, palette = gettext(Rpalette()))+
+      labs(title=paste(Rprod(), "by state", sep =" "))+
+      theme(
+      text = element_text(size=24, family="mont"),
+      title = element_text(size=30, family="open", face="bold", lineheight = .5))
   })
 }
 
