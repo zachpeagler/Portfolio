@@ -5,13 +5,32 @@ library(shiny)
 library(tidyverse)
 library(scico)
 library(showtext)
-library(sf)
+library(tigris)
 library(ggthemes)
 library(ggspatial)
 
 # load data
-LH_state_file <- "LH_state.shp"
-LH_state <- st_read(LH_state_file)
+LH_state_file <- "C:/Github/Portfolio/R Shiny Apps/03 US State Crop Producers/lh_state_cleaned.csv"
+LH_state <- read.csv(LH_state_file)
+
+usa <- states()
+## filter down to the continental 48 states
+usa48 <- usa %>%
+  filter(NAME!="American Samoa",
+         NAME!="Guam",
+         NAME!="Commonwealth of the Northern Mariana Islands",
+         NAME!="United States Virgin Islands",
+         NAME!="Puerto Rico",
+         NAME!="Hawaii",
+         NAME!="Alaska",
+         NAME!="District of Columbia") %>%
+  mutate(lon = st_coordinates(st_centroid(.))[,1],
+         lat = st_coordinates(st_centroid(.))[,2])
+# order by state name
+usa48 <- usa48[order(usa48$NAME),]
+
+# merge state geometry info with production info
+us_st_prod <- merge(usa48, LH_state, by.x="NAME", by.y="State")
 
 # graphical setup
 ## colors
@@ -21,15 +40,9 @@ font_add_google("Open Sans", family = "open")
 font_add_google("Montserrat", family = "mont")
 showtext_auto()
 
-# go ahead and make objects for cropnames and seasons
+# go ahead and make objects for seasons and crops
 seasons <- c("Spring", "Summer", "Fall", "Winter")
-## drop all crops that have 0 farms producing them anywhere
-LH_crops <- st_drop_geometry(LH_state[,13:221])
-cnames <- colnames(LH_crops)
-cropnames <- as.data.frame(cnames)
-cropnames$csums <- sapply(LH_crops, sum)
-crops_cut <- cropnames %>% filter(csums != 0)
-cutprods <- crops_cut$cnames
+crops <- names(st_drop_geometry(us_st_prod[,47:208]))
 
 # UI
 ui <- fluidPage(
@@ -43,8 +56,11 @@ ui <- fluidPage(
                   choices = cutprods, selected = "corn"),
       selectInput("palette","Select Palette",
                   choices = p_palettes, selected = "bilbao"),
-      selectInput("season", "Select Season",
-                  choices = seasons, selected = "Fall")
+      selectInput("fwrap", "Facet Wrap by Season",
+                  choices = c("TRUE, FALSE"), selected = "FALSE"),
+      conditionalPanel(condition = "input.fwrap == 'FALSE'",
+                       selectInput("season", "Select Season",
+                                   choices = seasons, selected = "Fall"))
     ), #-- end sidebar
     ### main panel with plot
     mainPanel(
@@ -68,7 +84,7 @@ server <- function(input, output) {
     LH_season <- LH_state %>% filter(Season == Rseason())
     
     # generate plot
-    ggplot(LH_season, aes(fill=.data[[Rprod()]]))+
+    ggplot(us_st_prod, aes(fill=.data[[Rprod()]]))+
       geom_sf(color="black")+
       scale_fill_scico(begin=1, end=0, palette = gettext(Rpalette()))+
       guides(fill = guide_colorbar(title = Rprod()))+
@@ -91,6 +107,10 @@ server <- function(input, output) {
             plot.caption = element_text(size=20, family="mont", face="italic", lineheight = .5))
   }) ## end map output
   
+  # create map
+  output$hist <- renderPlot({
+    
+  })
 }
 
 # run app
