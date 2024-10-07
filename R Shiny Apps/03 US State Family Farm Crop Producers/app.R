@@ -68,16 +68,16 @@ ui <- fluidPage(
   ### sidebar with select for product and palette
   sidebarLayout(
     sidebarPanel(
-      selectInput("product","Select Product",
+      selectInput("product","Select Farm Product",
                   choices = crops, selected = "corn"),
-      selectInput("palette","Select Palette",
+      selectInput("palette","Select Color Palette",
                   choices = p_palettes, selected = "bilbao"),
-      checkboxInput("fwrap", "Facet Wrap by Season", value = FALSE),
+      checkboxInput("fwrap", "Individual Maps for Each Season", value = FALSE),
       conditionalPanel(condition = "input.fwrap == FALSE",
                        selectInput("season", "Select Season",
                                    choices = seasons, selected = "Fall")),
-      checkboxInput("labels", "Labels", value =FALSE),
-      sliderInput("nstates", "Top n States", min = 1, max = 50, value = 10)
+      checkboxInput("labels", "Map Label", value =FALSE),
+      sliderInput("nstates", "Number of States on Bar Plot", min = 1, max = 50, value = 10)
                   ), #-- end sidebar
     ### main panel with plot
     mainPanel(
