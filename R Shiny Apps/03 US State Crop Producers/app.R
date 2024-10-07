@@ -9,11 +9,9 @@ library(tigris)
 library(sf)
 library(ggthemes)
 library(ggspatial)
-library(DT)
+library(bslib)
 
 # load data
-## test file location
-#LH_state_file <- "C:/Github/Portfolio/R Shiny Apps/03 US State Crop Producers/lh_state_cleaned.csv"
 ## deployment file
 LH_state_file <- "lh_state_cleaned.csv"
 ## read data
@@ -74,18 +72,19 @@ ui <- fluidPage(
                   choices = crops, selected = "corn"),
       selectInput("palette","Select Palette",
                   choices = p_palettes, selected = "bilbao"),
-      checkboxInput("fwrap", "Facet Wrap by Season", value=FALSE),
+      checkboxInput("fwrap", "Facet Wrap by Season", value = FALSE),
       conditionalPanel(condition = "input.fwrap == FALSE",
                        selectInput("season", "Select Season",
                                    choices = seasons, selected = "Fall")),
-      checkboxInput("labels", "Labels", value=FALSE),
+      checkboxInput("labels", "Labels", value =FALSE),
       sliderInput("nstates", "Top n States", min = 1, max = 50, value = 10)
                   ), #-- end sidebar
     ### main panel with plot
     mainPanel(
-      plotOutput("map"),
-      plotOutput("bar"),
-      DTOutput("topstates")
+      card(card_header("Map"), width=500, height=500,
+      plotOutput("map")),
+      card(card_header("Bar Plot"), width=500, height=500,
+      plotOutput("bar"))
               ) #-- end mainpanel
     ) #-- end layout
 ) #-- end fluidpage
@@ -105,12 +104,10 @@ server <- function(input, output) {
       us_st_prod %>%
       arrange(desc(.data[[input$product]])) %>%
       filter(Season == Rseason()) %>%
-      head(input$nstates)
-  })
-
+      head(input$nstates) })
+  
   # create map
   output$map <- renderPlot({
-    
     # filter the data to only be the selected season
     us_st_season <- us_st_prod %>% filter(Season == Rseason())
     move_states_season <- move_states %>% filter(Season == Rseason())
@@ -120,7 +117,7 @@ server <- function(input, output) {
       p <- ggplot(us_st_season, aes(fill=.data[[Rprod()]]))+
         geom_sf(color="black")+
         scale_fill_scico(begin=1, end=0, palette = gettext(Rpalette()))+
-        guides(fill = guide_colorbar(title = Rprod()))+
+        guides(fill = guide_colorbar(title = paste(Rprod(), "producing farms", sep=" ")))+
         labs(title=paste("Number of farms that produce", Rprod(), "by state", sep =" "),
              subtitle="For family farms in the 48 continental United States",
              caption="Data from localharvest (2024) and tigris (2022)")+
@@ -134,10 +131,10 @@ server <- function(input, output) {
               legend.direction = "horizontal",
               legend.title = element_text(size=20, family="open"),
               strip.background = element_rect(fill=NA, color=NA),
-              text = element_text(size=24, family="mont"),
-              title = element_text(size=30, family="open", face="bold", lineheight = .5),
-              plot.subtitle = element_text(size=24, family="mont", face="italic", lineheight = .5),
-              plot.caption = element_text(size=20, family="mont", face="italic", lineheight = .5)
+              text = element_text(size=20, family="mont"),
+              title = element_text(size=24, family="open", face="bold", lineheight = .5),
+              plot.subtitle = element_text(size=20, family="mont", face="italic", lineheight = .5),
+              plot.caption = element_text(size=16, family="mont", face="italic", lineheight = .5)
               ) # end theme
       if (Rlab() == TRUE) {
         p <- p + geom_label(data = filter(us_st_season, !NAME %in% move_labels),
@@ -158,7 +155,7 @@ server <- function(input, output) {
         geom_sf(color="black")+
         scale_fill_scico(begin=.8, end=0, palette = gettext(Rpalette()))+
         facet_wrap(~Season)+
-        guides(fill = guide_colorbar(title = Rprod()))+
+        guides(fill = guide_colorbar(title = paste(Rprod(), "producing farms", sep=" ")))+
         labs(title=paste("Number of farms that produce", Rprod(), "by state", sep =" "),
              subtitle="For family farms in the 48 continental United States",
              caption="Data from localharvest (2024) and tigris (2022)")+
@@ -170,10 +167,10 @@ server <- function(input, output) {
               legend.title.position = "top",
               legend.title = element_text(size=20, family="open"),
               strip.background = element_rect(fill=NA, color=NA),
-              text = element_text(size=24, family="mont"),
-              title = element_text(size=30, family="open", face="bold", lineheight = .5),
-              plot.subtitle = element_text(size=24, family="mont", face="italic", lineheight = .5),
-              plot.caption = element_text(size=20, family="mont", face="italic", lineheight = .5)
+              text = element_text(size=20, family="mont"),
+              title = element_text(size=24, family="open", face="bold", lineheight = .5),
+              plot.subtitle = element_text(size=20, family="mont", face="italic", lineheight = .5),
+              plot.caption = element_text(size=16, family="mont", face="italic", lineheight = .5)
               ) # end theme
       if (Rlab() == TRUE) {
           p <- p + geom_label(data = filter(us_st_prod, !NAME %in% move_labels),
@@ -199,22 +196,19 @@ server <- function(input, output) {
       geom_col()+
       ylab("Crop Producing Farms")+
       xlab("State")+
-      labs(title=paste("Number of farms that produce", Rprod(), "by state", sep =" "),
-           subtitle=paste("For the top", Rtopn(), Rprod(), "producing family farms in the continental United States", sep=" "))+
+      labs(title=paste("States with the most family farms that produce", Rprod(), sep =" "),
+           subtitle=paste("For the", Rtopn(), "continental states with the most", Rprod(), "producing family farms", sep=" "))+
       scale_fill_scico(begin=.8, end=0, palette = gettext(Rpalette()))+
       theme_minimal()+
       theme(
-      text = element_text(size=24, family="mont"),
-      title = element_text(size=30, family="open", face="bold", lineheight = .5),
-      plot.subtitle = element_text(size=24, family="mont", face="italic", lineheight = .5),
-      axis.text.x = element_text(size=24, family= "mont", angle=45, hjust=1, vjust=1.1)
+      legend.position = "none",
+      text = element_text(size=20, family="mont"),
+      title = element_text(size=24, family="open", face="bold", lineheight = .5),
+      plot.subtitle = element_text(size=20, family="mont", face="italic", lineheight = .5),
+      axis.text.x = element_text(size=16, family= "mont", angle=45, hjust=1, vjust=1.1)
       )
   }) # end barplot
   
-  # DT
-  output$topstates <- renderDT({
-    Rtopprod()
-  }) # end topstates output renderDT
 } # end server function
 
 # run app
