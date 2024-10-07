@@ -5,7 +5,7 @@
 ![year](https://img.shields.io/badge/year-2024-lightgrey)
 ![new](https://img.shields.io/badge/lifecycle-newapp-brightgreen)
 
-![App Screenshot](R Shiny Apps/03 US State Family Farm Crop Producers/screenshot.png)
+![App Screenshot](../03%20US%20State%20Family%20Farm%20Crop%20Producers/screenshot.png)
 
 # Link
 
