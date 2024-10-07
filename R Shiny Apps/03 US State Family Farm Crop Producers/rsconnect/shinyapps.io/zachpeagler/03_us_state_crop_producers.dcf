@@ -5,8 +5,9 @@ account: zachpeagler
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 12940834
-bundleId:
+bundleId: 9193703
 url: https://zachpeagler.shinyapps.io/03_us_state_crop_producers/
 version: 1
 asMultiple: FALSE
 asStatic: FALSE
+ignoredFiles: DESCRIPTION.txt|LICENSE.md|README.md|screenshot.png

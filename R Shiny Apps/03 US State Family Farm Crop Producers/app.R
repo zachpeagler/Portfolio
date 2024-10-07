@@ -63,7 +63,7 @@ move_states <- us_st_prod %>%
 # UI
 ui <- fluidPage(
   ### application title
-  titlePanel("Localharvest State Production"),
+  titlePanel("US State Family Farm Crop Producers"),
   
   ### sidebar with select for product and palette
   sidebarLayout(
@@ -81,9 +81,9 @@ ui <- fluidPage(
                   ), #-- end sidebar
     ### main panel with plot
     mainPanel(
-      card(card_header("Map"), width=500, height=500,
+      card(width=500, height=500,
       plotOutput("map")),
-      card(card_header("Bar Plot"), width=500, height=500,
+      card(width=500, height=500,
       plotOutput("bar"))
               ) #-- end mainpanel
     ) #-- end layout
@@ -129,12 +129,12 @@ server <- function(input, output) {
               legend.position.inside = c(0,.1),
               legend.title.position = "top",
               legend.direction = "horizontal",
-              legend.title = element_text(size=20, family="open"),
+              legend.title = element_text(size=24, family="open"),
               strip.background = element_rect(fill=NA, color=NA),
-              text = element_text(size=20, family="mont"),
-              title = element_text(size=24, family="open", face="bold", lineheight = .5),
-              plot.subtitle = element_text(size=20, family="mont", face="italic", lineheight = .5),
-              plot.caption = element_text(size=16, family="mont", face="italic", lineheight = .5)
+              text = element_text(size=24, family="mont"),
+              title = element_text(size=30, family="open", face="bold", lineheight = .5),
+              plot.subtitle = element_text(size=24, family="mont", face="italic", lineheight = .5),
+              plot.caption = element_text(size=20, family="mont", face="italic", lineheight = .5)
               ) # end theme
       if (Rlab() == TRUE) {
         p <- p + geom_label(data = filter(us_st_season, !NAME %in% move_labels),
@@ -165,12 +165,12 @@ server <- function(input, output) {
         theme_map() +
         theme(legend.position = "topright",
               legend.title.position = "top",
-              legend.title = element_text(size=20, family="open"),
+              legend.title = element_text(size=24, family="open"),
               strip.background = element_rect(fill=NA, color=NA),
-              text = element_text(size=20, family="mont"),
-              title = element_text(size=24, family="open", face="bold", lineheight = .5),
-              plot.subtitle = element_text(size=20, family="mont", face="italic", lineheight = .5),
-              plot.caption = element_text(size=16, family="mont", face="italic", lineheight = .5)
+              text = element_text(size=24, family="mont"),
+              title = element_text(size=30, family="open", face="bold", lineheight = .5),
+              plot.subtitle = element_text(size=24, family="mont", face="italic", lineheight = .5),
+              plot.caption = element_text(size=20, family="mont", face="italic", lineheight = .5)
               ) # end theme
       if (Rlab() == TRUE) {
           p <- p + geom_label(data = filter(us_st_prod, !NAME %in% move_labels),
@@ -196,16 +196,16 @@ server <- function(input, output) {
       geom_col()+
       ylab("Crop Producing Farms")+
       xlab("State")+
-      labs(title=paste("States with the most family farms that produce", Rprod(), sep =" "),
+      labs(title=paste("Number of family farms that produce", Rprod(), "by state", sep =" "),
            subtitle=paste("For the", Rtopn(), "continental states with the most", Rprod(), "producing family farms", sep=" "))+
       scale_fill_scico(begin=.8, end=0, palette = gettext(Rpalette()))+
       theme_minimal()+
       theme(
       legend.position = "none",
-      text = element_text(size=20, family="mont"),
-      title = element_text(size=24, family="open", face="bold", lineheight = .5),
-      plot.subtitle = element_text(size=20, family="mont", face="italic", lineheight = .5),
-      axis.text.x = element_text(size=16, family= "mont", angle=45, hjust=1, vjust=1.1)
+      text = element_text(size=24, family="mont"),
+      title = element_text(size=30, family="open", face="bold", lineheight = .5),
+      plot.subtitle = element_text(size=24, family="mont", face="italic", lineheight = .5),
+      axis.text.x = element_text(size=20, family= "mont", angle=45, hjust=1, vjust=1.1)
       )
   }) # end barplot
   
