@@ -76,7 +76,7 @@ ui <- fluidPage(
       conditionalPanel(condition = "input.fwrap == FALSE",
                        selectInput("season", "Select Season",
                                    choices = seasons, selected = "Fall")),
-      checkboxInput("labels", "Map Label", value =FALSE),
+      checkboxInput("labels", "Map Labels", value =FALSE),
       sliderInput("nstates", "Number of States on Bar Plot", min = 1, max = 50, value = 10)
                   ), #-- end sidebar
     ### main panel with plot
@@ -153,7 +153,7 @@ server <- function(input, output) {
     else {
       p <- ggplot(us_st_prod, aes(fill=.data[[Rprod()]]))+
         geom_sf(color="black")+
-        scale_fill_scico(begin=.8, end=0, palette = gettext(Rpalette()))+
+        scale_fill_scico(begin=1, end=0, palette = gettext(Rpalette()))+
         facet_wrap(~Season)+
         guides(fill = guide_colorbar(title = paste(Rprod(), "producing farms", sep=" ")))+
         labs(title=paste("Number of farms that produce", Rprod(), "by state", sep =" "),
