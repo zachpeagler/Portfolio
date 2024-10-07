@@ -7,9 +7,12 @@
 
 ![App Screenshot](../03%20US%20State%20Family%20Farm%20Crop%20Producers/screenshot.png)
 
-# Link
-
+# Links
 [Link](https://zachpeagler.shinyapps.io/03_us_state_crop_producers)
+
+## QR Code
+
+![QRCode](../03%20US%20State%20Family%20Farm%20Crop%20Producers/qrcode.png)
 
 # Description
 
