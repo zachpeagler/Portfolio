@@ -5,7 +5,7 @@ account: zachpeagler
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 12918114
-bundleId: 9182534
+bundleId: 9190206
 url: https://zachpeagler.shinyapps.io/us_state_family_farm_products/
 version: 1
 asMultiple: FALSE
