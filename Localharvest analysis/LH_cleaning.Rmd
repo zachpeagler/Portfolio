@@ -5,49 +5,17 @@ date: "2024-09-08"
 output: html_document
 ---
 
-# Introduction
-
-This analysis was done in conjunction with my Master's of Science in Integrative Biology at Kennesaw State University looking at the effect of microbes on tomato growth and crop production. As part of that project, I was looking to interview local farmers near me and in my search came upon localharvest.org, a website dedicated to providing small farmers a platform on which to connect with a larger audience, advertise crop share agreements, and more. Localharvest has far more farmers than I could possibly talk to, and while the data it contains was not exactly what I was looking for, it was a treasure trove of data and best of all - self-reported and publicly available online. I wrote a Python script to scrape farmer data over the course of several months.
-
-This particular analysis displays several skills, including
-1. Cleaning badly formed data
-2. Combining original data with public databases
-3. Advanced mapmaking
-
 # 1. Setup
 
-## 1.1 Load packages
+## Load packages
 
-Load packages. Tidyverse is essential for dplyr and ggplot2. Showtext enables advanced font rendering. Scico for colorblind accessible color palettes. ggpubr and ggspatial to make advanced graphical plots easy. sf for spatial vector data. tigris for retrieving US census data.
+Load packages. dplyr is essential for data wrangling. tigris for retrieving US census data.
 
 ```{r load_packages, include=TRUE}
 knitr::opts_chunk$set(echo = TRUE)
-require(tidyverse); require(showtext); require(scico); require(pwr); require(ggpubr); require(ggspatial); require(sf); require(ggthemes); require(tigris)
+require(dplyr); require(tigris)
 
 options(tigris_use_cache=TRUE)
-```
-
-## 1.2 Graphical Setup
-
-Load colors. Set the palette to one of the scientific color map palettes (scico) and create variants that contain the specific values for 2, 4, and 10 colors. This helps when working with factors, as it can be a pain to apply gradients otherwise. I also make the vector of colors =n+1 because the final value in scico palettes are often white, rendering them hard to see against a white plot background. (and we use white plot backgrounds because colored backgrounds are difficult to parse and expensive to print)
-
-Load fonts. Google's Open Sans for titles and Montserrat for body text.
-
-Set shape selection.
-
-```{r g_setup, include=TRUE}
-
-p_palettes <- scico_palette_names()
-a_palette <- "lipari"
-## it's a good idea to use n+1 for palettes as often the last color is white (invisible against the default background)
-two_colors = scico(3, palette=a_palette)
-four_colors = scico(5, palette=a_palette)
-true_two_col = scico(2, palette=a_palette)
-ten_col = scico(10, palette=a_palette)
-
-font_add_google("Open Sans", family = "open")
-font_add_google("Montserrat", family = "mont")
-showtext_auto()
 ```
 
 # 2. Load Data
