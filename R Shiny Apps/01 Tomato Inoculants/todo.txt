@@ -1,0 +1,8 @@
+1. keep going from gsw_analysis in TIP24_Analysis
+2. put TIP24_Analysis in app 01 repo
+
+
+once finished:
+    1. screenshot
+    2. qrcode
+    3. finish readme, taking liberally from thesis and ABDA work

@@ -8,17 +8,14 @@ library(showtext)
 library(tigris)
 library(sf)
 library(ggthemes)
-library(ggspatial)
 library(bslib)
 library(leaflet)
 
 # load data
 ## deployment file
-LH_city_file <- "lh_city_cleaned.csv"
+LH_farm_file <- "lh_farms_cleaned.csv"
 ## read data
-LH_city <- read.csv(LH_city_file)
-## get states
-usa <- states()
+LH_farms <- read.csv(LH_farm_file)
 ## get cities from tigris
 cities <- places(cb=TRUE)
 ## add lat and long from the geometry and
@@ -58,27 +55,30 @@ non_cont_states <- c("American Samoa", "Guam", "Commonwealth of the Northern Mar
 
 # UI
 ui <- fluidPage(
+  
+  tags$head(
+            includeCSS("styles.css"),
+           ),
   ### application title
   titlePanel("US City Family Farm Products"),
-  ### sidebar with select for product and palette
-  sidebarLayout(
-    sidebarPanel(
+  ### create leaflet map
+  leafletOutput("map", width="100%", height-"100%"),
+  ### absolute panel with controls and a barplot
+  absolutePanel(id="controls", class="panel panel-default", fixed = TRUE,
+                draggable = TRUE, top = 60, left = "auto", right = 20, bottom = "auto",
+                width= 330, height="auto",
+                
+                h2("Control Panel"),
+                
       selectInput("product","Select Farm Product",
                   choices = products, selected = "corn"),
       selectInput("palette","Select Color Palette",
                   choices = p_palettes, selected = "bilbao"),
       selectInput("season", "Select Season",
                   choices = seasons, selected = "Fall"),
-      sliderInput("ncities", "Number of Cities on Bar Plot", min = 1, max = 100, value = 10)
-                  ), #-- end sidebar
-    ### main panel with plot
-    mainPanel(
-      card(width=500, height=500,
-      plotOutput("map")),
-      card(width=500, height=500,
-      plotOutput("bar"))
-              ) #-- end mainpanel
-    ) #-- end layout
+      sliderInput("ncities", "Number of Cities on Bar Plot", min = 1, max = 100, value = 10),
+      plotOutput("bar")
+  ) # end absolutePanel
 ) #-- end fluidpage
 
 # server
