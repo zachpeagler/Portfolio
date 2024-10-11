@@ -40,6 +40,7 @@ Li_data <- read.csv(tfile, stringsAsFactors = T) %>%
   # filter to leak% < 10 and gsw > 0
   filter(leak_pct<10, gsw > 0) %>%
   mutate(Date = parse_date_time(Date, orders = "mdy"),
+         Date = as.numeric(Date),
          plant_fac = as.factor(paste(Row, Pot)),
          Treatment = factor(Treatment, levels=c("Control", "Germination", 
                                                 "Transplantation", "Germ+Trans"))
@@ -80,7 +81,8 @@ Qmass <- quantile(na.omit(Fl_data$mass), probs=c(.25, .75), na.rm=FALSE)
 Qsug <- quantile(na.omit(Fl_data$sugar_avg), probs=c(.25, .75), na.rm=FALSE)
 iqr_mass <- IQR(na.omit(Fl_data$mass))
 iqr_sug <- IQR(na.omit(Fl_data$sugar_avg))
-
+## Make some variable groups
+fluoro_vars <- c("gsw", "PhiPS2", "Date", "Time", "Treatment", "rh_s", "Tleaf", "Qamb", "VPDleaf", "plant_fac")
 ###### UI #####
 ui <- navbarPage(title = "Tomato Inoculants",
                  theme = bs_theme(bg = "white", fg=sls8[1], primary = sls8[5],
@@ -112,26 +114,31 @@ ui <- navbarPage(title = "Tomato Inoculants",
       tabPanel("Plots"),
       tabPanel("Statistical Tests"),
       tabPanel("Tableau-Style Explorer",
-        card(card_header("Explanation of Fruit Variables"),
-             card_body(markdown("The tomatoes were grown in 4 rows of 12 pots each, with each row corresponding to a different inoculation treatment. The data table below is formatted in a tidy format with each row corresponding to one fruit and each column representing a variable.<br>
-                                **Treatment** is the inoculation timing of the tomato. Options are Control, Germination, Transplantation, and Germ+Trans. <br>
-                                **row** is the row number of the tomato. (1:4) <br>
-                                **plant** is the pot number of the tomato. (1:12) <br>
-                                **plant_fac** is a combination of *row* and *plant*, and acts as an ID for every individual plant. (1 1: 4 12) <br>
-                                **mass** is the mass in grams of the tomato, measured on an *SCALE NAME*. (~50:~400) <br>
-                                **BER** corresponds to whether or not the tomato has blossom end rot, a disease caused by calcium deficiency that renders the fruit unmarketable. (0,1) <br>
-                                **fungus** corresponds to whether or not the tomato has fungus growing on it. This is common on fruit with BER. (0,1) <br>
-                                **cracking** corresponds to whether or not the tomato has cracks in its skin (0,1) <br>
-                                **penetrometer** corresponds to the force in kilograms it takes to penetrate the flesh of the tomato (~0.5:~4) <br>
-                                **ripeness** is the **penetrometer** value mapped from 0:1 and reversed, so that riper fruit are closer to 1 and unripe fruit are closer to 0. (0:1) <br>
-                                **sugar.1** and **sugar.2** are measurements of the tomato juice's sugar concentration taken on a Fisher BRIX Refractometer (~2:~12) <br>
-                                **sugar_avg** is the average of the two sugar measurements. <br>
-                                **date_harvest** is the date the fruit was harvested (August 2024:October 2024) <br>
-                                **date_analysis** is the date the fruit was analyzed in the lab (August 2024:October 2024) <br>
-                                **d_diff** is the number of days from harvest to analysis. (0:6)"))),
         gwalkrOutput("f_gwalk"),
         card(card_body(markdown("For more information on using GWalkR's Tableau-style visualizations please see the author's [Github repo](https://github.com/Kanaries/GWalkR).")))
-      )
+      ),
+      tabPanel("Info",
+         card(
+          card_body(
+            markdown("The tomatoes were grown in 4 rows of 12 pots each, with each row corresponding to a different inoculation treatment. The data table below is formatted in a tidy format with each row corresponding to one fruit and each column representing a variable.<br>
+                      ### Explanatory Variables <br> 
+                      **Treatment** is the inoculation timing of the tomato. Options are Control, Germination, Transplantation, and Germ+Trans. <br>
+                      **row** is the row number of the tomato. (1:4) <br>
+                      **plant** is the pot number of the tomato. (1:12) <br>
+                      **plant_fac** is a combination of *row* and *plant*, and acts as an ID for every individual plant. (1 1: 4 12) <br>
+                      **date_harvest** is the date the fruit was harvested (August 2024:October 2024) <br>
+                      **date_analysis** is the date the fruit was analyzed in the lab (August 2024:October 2024) <br>
+                      **d_diff** is the number of days from harvest to analysis. (0:6)
+                      ### Response Variables <br>
+                      **mass** is the mass in grams of the tomato, measured on an *SCALE NAME*. (~50:~400) <br>
+                      **BER** corresponds to whether or not the tomato has blossom end rot, a disease caused by calcium deficiency that renders the fruit unmarketable. (0,1) <br>
+                      **fungus** corresponds to whether or not the tomato has fungus growing on it. This is common on fruit with BER. (0,1) <br>
+                      **cracking** corresponds to whether or not the tomato has cracks in its skin (0,1) <br>
+                      **penetrometer** corresponds to the force in kilograms it takes to penetrate the flesh of the tomato (~0.5:~4) <br>
+                      **ripeness** is the **penetrometer** value mapped from 0:1 and reversed, so that riper fruit are closer to 1 and unripe fruit are closer to 0. (0:1) <br>
+                      **sugar.1** and **sugar.2** are measurements of the tomato juice's sugar concentration taken on a Fisher BRIX Refractometer (~2:~12) <br>
+                      **sugar_avg** is the average of the two sugar measurements. <br>")))
+               ) # end info panel
     ) # end tab set
   ), # end fruit page
   nav_panel("Fluorescence",
@@ -209,7 +216,15 @@ ui <- navbarPage(title = "Tomato Inoculants",
       tabPanel("Plots",
                card(card_header("Interactive Scatter Plot",
                                 class = "bg-primary"),
-                    card_body(plotOutput("fluoro_scatter"))
+                    layout_sidebar(sidebar = sidebar(
+                      selectInput("fluoro_x","X Variable",
+                                  choices = fluoro_vars, selected = "Date"),
+                      selectInput("fluoro_y","Y Variable",
+                                  choices = fluoro_vars, selected = "gsw"),
+                      selectInput("fluoro_col","Color Variable",
+                                  choices = fluoro_vars, selected = "rh_s")
+                      ),
+                      card_body(plotOutput("fluoro_scatter")))
                ),
                card(card_header("Stomatal Conductance (gsw)",
                                 class = "bg-primary"),
@@ -256,28 +271,35 @@ ui <- navbarPage(title = "Tomato Inoculants",
                              value_box(title = "AIC", value = textOutput("gsw_glm_log_AIC"))
                            ))
                           )
-                      ))) # end gsw card
+                      ))), # end gsw card
+               card(card_header("Photosystem II Efficiency (PhiPS2"),
+                    card_body("Based on the exploratory analysis, PhiPS2 does not match any distribution. Therefore, we will use our biological reasoning and look at what distribution PhiPS2 was most alike on the PDF and CDF. On a biological level, PhiPS2 is the efficiency of a part of the clorophyll, and probably follows some sort of inverse square law, and based on the PDF it's a bit right skewed, making a Gamma distribution an excellent choice for analysis. When constructing our model, we should also take into account fixed effects, such as ambient light (Qamb), and random effects, such as the pot along a row.")
+                 
+               )
                ), # end statistical tests panel
       tabPanel("Tableau-Style Explorer",
-               card(card_header("Explanation of Fluorescence Variables"),
-                    card_body(markdown("Fluorescence measurements were taken biweekly with a LI-COR LI-600 over the course of the trial. Data is presented in a tidy format with each row representing a single observation and each column representing a variable. <br>
+               card(gwalkrOutput("li_gwalk"),
+                    card_body(markdown("For more information on using GWalkR's Tableau-style visualizations please see the author's [Github repo](https://github.com/Kanaries/GWalkR)."))
+                    )
+              ),
+      tabPanel("Info",
+               card(markdown("Fluorescence measurements were taken biweekly with a LI-COR LI-600 over the course of the trial. Data is presented in a tidy format with each row representing a single observation and each column representing a variable. <br>
+                             ### Explanatory Variables   
                                 **Treatment** is the inoculation timing of the tomato. Options are Control, Germination, Transplantation, and Germ+Trans. <br>
                                 **Time** is the time at which the measurement was taken. <br>
                                 **Date** is the date at which the measurement was taken. <br>
                                 **Row** is the row number of the tomato. (1:4) <br>
                                 **Pot** is the pot number of the tomato. (1:12) <br>
                                 **plant_fac** is a combination of *Row* and *Pot*, and acts as an ID for every individual plant. (1 1: 4 12) <br>
-                                **gsw** is the stomatal conductance (mol m-2 s-1) of the leaf. <br>
-                                **VPDleaf** is the vapor pressure deficit (add units) of the leaf. <br>
-                                **PhiPS2** is the efficiency of photosystem II of the leaf. It is unitless. (0:1) <br>
                                 **rh_s** is the relative humidity (add units) of the leaf. <br>
                                 **Tleaf** is the temperature (C) of the leaf. <br>
                                 **Qamb** is the ambient light level (add units) at the time of the observation.
-                                ")),
-                    gwalkrOutput("li_gwalk"),
-                    card_body(markdown("For more information on using GWalkR's Tableau-style visualizations please see the author's [Github repo](https://github.com/Kanaries/GWalkR)."))
-                    )
-              )
+                             ### Response Variables   
+                                **gsw** is the stomatal conductance (mol m-2 s-1) of the leaf. <br>
+                                **VPDleaf** is the vapor pressure deficit (add units) of the leaf. <br>
+                                **PhiPS2** is the efficiency of photosystem II of the leaf. It is unitless. (0:1) <br>
+                                "))
+               )
     ) # end tab set
   ), # end fluorescence page
   nav_spacer(),
@@ -288,7 +310,10 @@ ui <- navbarPage(title = "Tomato Inoculants",
 server <- function(input, output) {
 ## Reactive expressions
   Rpalette <- reactive({input$palette})
-### Reactive dataframes
+  Rfluoro_x <- reactive({input$fluoro_x})
+  Rfluoro_y <- reactive({input$fluoro_y})
+  Rfluoro_col <- reactive({input$fluoro_col})
+  ### Reactive dataframes
   RLi_data <- reactive({
     x <- Li_data
     if (input$outliers == TRUE) {
@@ -503,6 +528,22 @@ server <- function(input, output) {
       )
   })
 
+## Fluoro interactive scatter plot
+  output$fluoro_scatter <- renderPlot({
+    ggplot(data = RLi_data(), aes(x=.data[[Rfluoro_x()]], y = .data[[Rfluoro_y()]], 
+                               color = .data[[Rfluoro_col()]])) +
+      geom_point()+
+      scale_color_scico(begin=0.9, end=0, palette=Rpalette())+
+      scale_x_discrete(guide=guide_axis(check.overlap=TRUE))+
+      theme_minimal()+
+      ylab(gettext(Rfluoro_y()))+
+      xlab(gettext(Rfluoro_x()))+
+      theme(
+        text = element_text(size=24, family="mont"),
+        axis.title = element_text(size=24, family = "mont", face= "bold"),
+        title = element_text(size=30, family="open", face="bold", lineheight = .5)
+      )
+  })
 ## Statistical outputs
   output$gsw_glm_gamma <- renderPrint({ summary(Rgsw_glm_gamma())})
   output$gsw_glm_gamma_r2 <- renderPrint({ r.squaredGLMM(Rgsw_glm_gamma())})

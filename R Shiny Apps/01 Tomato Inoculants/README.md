@@ -75,3 +75,10 @@ DT - Xie Y, Cheng J, Tan X (2024). _DT: A Wrapper of the JavaScript
 
 GWalkR - Yu Y (2024). _GWalkR: Interactive Exploratory Data Analysis Tool_. R
   package version 0.2.0, <https://CRAN.R-project.org/package=GWalkR>.
+
+lme4 - Douglas Bates, Martin Maechler, Ben Bolker, Steve Walker (2015).
+  Fitting Linear Mixed-Effects Models Using lme4. Journal of
+  Statistical Software, 67(1), 1-48. doi:10.18637/jss.v067.i01.
+
+MuMIn - Bartoń K (2024). _MuMIn: Multi-Model Inference_. R package version
+  1.48.4, <https://CRAN.R-project.org/package=MuMIn>.
