@@ -1,14 +1,17 @@
 # Portfolio Style Sheet
 
 ## Fonts
+
 These require the use of the *showtext* package in R, and the use of the setup command showtext_auto().
 
 *I would love to figure out a way to use extralight-extrabold styles in R.*
+
 ### Titles and Headings
 
     Open Sans
 
 ### Captions, body text, and axes
+
     Montserrat
 
 ## Colors

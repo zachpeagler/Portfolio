@@ -1,5 +1,5 @@
-Title: 01 Tomato Inoculants
-ShortName: Tomato
+Title: 01 Tomato Inoculants 2024
+ShortName: TIP24
 Date: 2024-10-09
 Lifecycle: experimental
 Authors@R: c(

@@ -1,20 +1,20 @@
-# Tomato Inoculants
+# Tomato Inoculants 2024
 
 [![License: CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-blue.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/) 
 ![experimental](https://img.shields.io/badge/lifecycle-experimental-orange)
 ![year](https://img.shields.io/badge/year-2024-darkblue)
 ![new](https://img.shields.io/badge/age-new-brightgreen)
 
-![App Screenshot](../01%20Tomato%20Inoculants/screenshot.png)
+![App Screenshot](../01%20Tomato%20Inoculants%202024/screenshot.png)
 
 ## Links
 [Link to app](https://zachpeagler.shinyapps.io/01_tomato_inoculants)
 
-![QRCode](../01%20Tomato%20Inoculants/qrcode.png)
+![QRCode](../01%20Tomato%20Inoculants%2020204/qrcode.png)
 
 # Introduction
 
-An R Shiny app created as part of my Master's thesis at Kennesaw State University. It is a comprehensive analysis of four years of tomato data presented in an interactive format.
+An R Shiny app created as part of my Master's thesis at Kennesaw State University. It is a comprehensive analysis of a 7 month trial.
 
 This uses R, the packages tidyverse, shiny, showtext, scico, bslib, MASS, ggpubr, and GWalkR.
 
@@ -22,11 +22,21 @@ This uses R, the packages tidyverse, shiny, showtext, scico, bslib, MASS, ggpubr
 
 ## Predictions
 
-## Statistical tests reasoning
+# Methods
 
-## Visualization reasoning
+## Biological
 
-## Acknowledgements
+## Statistical
+
+### Statistical tests reasoning
+
+### Visualization reasoning
+
+# Results
+
+# Discussion
+
+# Acknowledgements
 
 This work could not have been possible without my incredible thesis advisor Mario Bretfeld, my committee, and my undergrads: Maddie, Minh, Serena, Collin, Kenadi, Sky, and Vanessa.
 
