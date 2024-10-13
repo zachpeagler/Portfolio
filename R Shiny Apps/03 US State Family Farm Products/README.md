@@ -1,9 +1,9 @@
 # US State Crop Producers
 
-[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/) 
+[![License: MIT](https://img.shields.io/badge/License-MIT-lightgrey.svg)](https://opensource.org/license/mit)
 ![experimental](https://img.shields.io/badge/lifecycle-experimental-orange)
 ![year](https://img.shields.io/badge/year-2024-lightgrey)
-![new](https://img.shields.io/badge/lifecycle-newapp-brightgreen)
+![new](https://img.shields.io/badge/lifecycle-new-brightgreen)
 
 ![App Screenshot](../03%20US%20State%20Family%20Farm%20Crop%20Producers/screenshot.png)
 
