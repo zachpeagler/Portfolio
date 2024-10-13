@@ -1,0 +1,14 @@
+Title: 03 US State Family Farm Products
+ShortName: State Farm
+Date: 2024-10-07
+Lifecycle: experimental
+Authors@R: c(
+    person(given = "Zach", family = "Peagler", email = "zachpeagler00@gmail.com", role = c("aut", "cre")),
+  )
+Description: This app takes cleaned data from Localharvest and plots it as a map and barplot with several user inputs.
+DisplayMode: Normal
+URL: https://zachpeagler.shinyapps.io/03_us_state_crop_producers
+BugReports: https://github.com/zachpeagler/Portfolio/issues
+License: CC-BY-NC-SA-4.0
+Tags: R, Python, Shiny, ggplot
+Type: Shiny

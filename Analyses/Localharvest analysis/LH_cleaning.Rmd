@@ -1,0 +1,436 @@
+---
+title: "LocalHarvest Data Cleaning"
+author: "Zach Peagler"
+date: "2024-09-08"
+output: html_document
+---
+
+# 1. Setup
+
+## Load packages
+
+Load packages. dplyr is essential for data wrangling. tigris for retrieving US census data.
+
+```{r load_packages, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+require(dplyr); require(tigris)
+
+options(tigris_use_cache=TRUE)
+```
+
+# 2. Load Data
+
+## Census data
+```{r census_data, include=TRUE}
+
+### STATE ###
+## us states from tigris (2022 US census data)
+usa <- states(cb=TRUE)
+## filter down to the continental 48 states
+usa48 <- usa %>%
+    filter(NAME!="American Samoa",
+         NAME!="Guam",
+         NAME!="Commonwealth of the Northern Mariana Islands",
+         NAME!="United States Virgin Islands",
+         NAME!="Puerto Rico",
+         NAME!="Hawaii",
+         NAME!="Alaska",
+         NAME!="District of Columbia") %>%
+     mutate(lon = st_coordinates(st_centroid(.))[,1],
+         lat = st_coordinates(st_centroid(.))[,2])
+## make an object of the names of the 48 states
+states48 <- usa48$NAME
+# order by state name
+usa48 <- usa48[order(usa48$NAME),]
+
+### CITY ###
+## us places (technically more than just cities) from tigris (2022 US census data)
+## create 'cities' object as a dataframe of cities and states.
+cities <- places(cb=TRUE)
+## filter down to the continental 48
+cities_cont <- cities %>%
+  filter(STATE_NAME!="American Samoa",
+         STATE_NAME!="Guam",
+         STATE_NAME!="Commonwealth of the Northern Mariana Islands",
+         STATE_NAME!="United States Virgin Islands",
+         STATE_NAME!="Puerto Rico",
+         STATE_NAME!="Hawaii",
+         STATE_NAME!="Alaska") %>%
+  mutate(lon = st_coordinates(st_centroid(.))[,1],
+         lat = st_coordinates(st_centroid(.))[,2])
+## create a matching ID to the one in LH_city
+cities_cont$ID <- paste(cities_cont$NAME, cities_cont$STATE_NAME, sep=", ")
+```
+
+## Load localharvest data
+```{r localharvest_data}
+
+### LOCALHARVEST ###
+# from my own data collection on localharvest.org in 2024
+##set localharvest data file location
+LH_data_file <- "C:/Data/LH_data/LH_Data.csv"
+## bring it in, add a farm count and reference date and parse the date
+LH_data <- read.csv(LH_data_file) %>%
+  mutate(
+    farm_count = 1,
+    Date_ref = Last_updated,
+    Last_updated = gsub('-', '/', Last_updated),
+    Last_updated = parse_date(Last_updated, format="%d/%b/%y"))
+## add membership columns
+LH_data <- LH_data %>%
+  mutate(
+    Naturally_grown = grepl("naturally grown", LH_data$Farming_practices),
+    GAP_cert = grepl("GAP", LH_data$Farming_practices),
+    Cert_organic = grepl("Certified Organic", LH_data$Farming_practices),
+    Cert_natgrown = grepl("Certified Naturally Grown", LH_data$Farming_practices),
+    IPM = grepl("integrated pest management", LH_data$Farming_practices),
+    ROP_cert = grepl("Demeter Certified", LH_data$Farming_practices),
+    Demeter_cert = grepl("Real Organic Project", LH_data$Farming_practices),
+    animal_welfare = grepl("animal welfare", LH_data$Farming_practices),
+    grass_fed = grepl("grass fed", LH_data$Farming_practices),
+    conventional = grepl("conventional", LH_data$Farming_practices),
+    transitional = grepl("transitional", LH_data$Farming_practices),
+    kosher = grepl("kosher", LH_data$Farming_practices),
+    halaal = grepl("halaal", LH_data$Farming_practices)
+  )
+
+## split location then add it back to the df as "City" and "State"
+loc <- as.data.frame(LH_data$Farm_location)
+names(loc)[names(loc) == 'LH_data$Farm_location'] <- 'loc'
+loc$loc <- strsplit(loc$loc, ',')
+loc <- unnest_wider(loc, 1, names_sep = '')
+loc$loc1 <- trimws(loc$loc1)
+loc$loc2 <- trimws(loc$loc2)
+LH_data$City <- loc$loc1
+LH_data$State <- loc$loc2
+
+# make a custom function for removing all special characters from a string i royally boned how i put it into the csv
+debone = function(x){
+  gsub('[^[:alnum:]]', '', x)
+}
+
+# Prod Winter
+## extract the winter products and separate strings by commas
+Prod_winter = sapply(LH_data$Prod_winter, strsplit, ",")
+## convert it from a list into a dataframe (if we gsub without doing this it turns into word soup)
+Prod_winter = data.frame(matrix(unlist(Prod_winter)))
+## rename the column containing the items to 'item'
+names(Prod_winter)[names(Prod_winter) == 'matrix.unlist.Prod_winter..'] <- 'item'
+## remove extraneous characters
+Prod_winter$item = apply(Prod_winter, 1, debone)
+## remove duplicate items
+UProd_W <- sort(unique(Prod_winter$item))
+## remove blanks
+UProd_W <- keep(UProd_W, UProd_W>0)
+
+# Prod Spring
+## extract the spring products and separate strings by commas
+Prod_spring = sapply(LH_data$Prod_spring, strsplit, ",")
+## convert it from a list into a dataframe (if we gsub without doing this it turns into word soup)
+Prod_spring = data.frame(matrix(unlist(Prod_spring)))
+## rename the column containing the items to 'item'
+names(Prod_spring)[names(Prod_spring) == 'matrix.unlist.Prod_spring..'] <- 'item'
+## remove extraneous characters
+Prod_spring$item = apply(Prod_spring, 1, debone)
+## remove duplicate items
+UProd_Sp <- sort(unique(Prod_spring$item))
+## remove blanks
+UProd_Sp <- keep(UProd_Sp, UProd_Sp>0)
+
+# Prod Summer
+## extract the summer products and separate strings by commas
+Prod_summer = sapply(LH_data$Prod_summer, strsplit, ",")
+## convert it from a list into a dataframe (if we gsub without doing this it turns into word soup)
+Prod_summer = data.frame(matrix(unlist(Prod_summer)))
+## rename the column containing the items to 'item'
+names(Prod_summer)[names(Prod_summer) == 'matrix.unlist.Prod_summer..'] <- 'item'
+## remove extraneous characters
+Prod_summer$item = apply(Prod_summer, 1, debone)
+## remove duplicate items
+UProd_Su <- sort(unique(Prod_summer$item))
+## remove blanks
+UProd_Su <- keep(UProd_Su, UProd_Su>0)
+
+# Prod Fall
+## extract the fall products and separate strings by commas
+Prod_fall = sapply(LH_data$Prod_fall, strsplit, ",")
+## convert it from a list into a dataframe (if we gsub without doing this it turns into word soup)
+Prod_fall = data.frame(matrix(unlist(Prod_fall)))
+## rename the column containing the items to 'item'
+names(Prod_fall)[names(Prod_fall) == 'matrix.unlist.Prod_fall..'] <- 'item'
+## remove extraneous characters
+Prod_fall$item = apply(Prod_fall, 1, debone)
+## remove duplicate items
+UProd_F <- sort(unique(Prod_fall$item))
+## remove blanks
+UProd_F <- keep(UProd_F, UProd_F>0)
+
+## find difference between summer and winter/fall (spring and summer are the same)
+d_suw <- UProd_Su[!(UProd_Su %in% UProd_W)]
+d_suf <- UProd_Su[!(UProd_Su %in% UProd_F)]
+
+## append missing elements to season production lists
+UProd_W <- append(UProd_W, d_suw)
+UProd_W <- sort(UProd_W)
+UProd_F <- append(UProd_F, d_suf)
+UProd_F <- sort(UProd_F)
+
+## make dataframes to add to for each season
+LH_names <- as.data.frame(LH_data[,c(1, 34,35)])
+colnames(LH_names)[1] <- "Farm Name"
+LH_names$ID <- paste(LH_names$City, LH_names$State, sep=", ")
+LH_names <- cbind(LH_names, LH_data[,c(4, 21:33)])
+LH_prod_f <- LH_names %>% mutate(Season="Fall")
+LH_prod_sp <- LH_names %>% mutate(Season="Spring")
+LH_prod_su <- LH_names %>% mutate(Season="Summer")
+LH_prod_w <- LH_names %>% mutate(Season="Winter")
+
+## iterate through our product lists and check if a farm is producing that item in that season
+for (x in UProd_F){
+  FPL_name = gettext(x)
+  FPL <- grepl(x, LH_data$Prod_fall, fixed=TRUE)
+  LH_prod_f <- cbind(LH_prod_f, FPL)
+  colnames(LH_prod_f)[which(names(LH_prod_f) == "FPL")] <- FPL_name
+}
+
+for (x in UProd_Sp){
+  FPL_name = gettext(x)
+  FPL <- grepl(x, LH_data$Prod_spring, fixed=TRUE)
+  LH_prod_sp <- cbind(LH_prod_sp, FPL)
+  colnames(LH_prod_sp)[which(names(LH_prod_sp) == "FPL")] <- FPL_name
+}
+
+for (x in UProd_Su){
+  FPL_name = gettext(x)
+  FPL <- grepl(x, LH_data$Prod_summer, fixed=TRUE)
+  LH_prod_su <- cbind(LH_prod_su, FPL)
+  colnames(LH_prod_su)[which(names(LH_prod_su) == "FPL")] <- FPL_name
+}
+
+for (x in UProd_W){
+  FPL_name = gettext(x)
+  FPL <- grepl(x, LH_data$Prod_winter, fixed=TRUE)
+  LH_prod_w <- cbind(LH_prod_w, FPL)
+  colnames(LH_prod_w)[which(names(LH_prod_w) == "FPL")] <- FPL_name
+}
+
+## convert logical columns to numeric
+### Base
+cols <- sapply(LH_data, is.logical)
+LH_data[,cols] <- lapply(LH_data[,cols], as.numeric)
+### Fall
+f_cols <- sapply(LH_prod_f, is.logical)
+LH_prod_f[,f_cols] <- lapply(LH_prod_f[,f_cols], as.numeric)
+### Spring
+sp_cols <- sapply(LH_prod_sp, is.logical)
+LH_prod_sp[,sp_cols] <- lapply(LH_prod_sp[,sp_cols], as.numeric)
+### Summer
+su_cols <- sapply(LH_prod_su, is.logical)
+LH_prod_su[,su_cols] <- lapply(LH_prod_su[,su_cols], as.numeric)
+### Winter
+w_cols <- sapply(LH_prod_w, is.logical)
+LH_prod_w[,w_cols] <- lapply(LH_prod_w[,w_cols], as.numeric)
+
+LH_prod <- rbind(LH_prod_f, LH_prod_w, LH_prod_sp, LH_prod_su)
+
+LH_prod <- LH_prod %>% mutate(`Product Diversity` = select(., almonds:zucchini)
+                              %>% rowSums(na.rm = TRUE),
+                              farm_count = 1)
+
+
+```
+
+## State localharvest
+
+Summarize lh data by state, process it a bit, and export it
+```{r state_lh}
+# sort into summary dataframes
+## summarize farm and membership by state
+LH_state_mfp <- LH_prod %>%
+  group_by(State, Season)%>%
+  summarise_at(vars(farm_count, Naturally_grown, GAP_cert, Cert_organic, Cert_natgrown, IPM, ROP_cert, Demeter_cert, animal_welfare, grass_fed, conventional, transitional, kosher, halaal), list(sum=sum)) %>%
+  filter(State %in% states48,
+         Season == "Fall")
+LH_state_mfp <- LH_state_mfp[,c(1,3:16)]
+LH_state_mfp <- LH_state_mfp %>%
+  mutate(p_NG = round(Naturally_grown_sum/farm_count_sum * 100, 0),
+         p_GAP = round(GAP_cert_sum/farm_count_sum* 100, 0),
+         p_CO = round(Cert_organic_sum/farm_count_sum* 100, 0),
+         p_CNG = round(Cert_natgrown_sum/farm_count_sum* 100, 0),
+         p_IPM = round(IPM_sum/farm_count_sum* 100, 0),
+         p_ROP = round(ROP_cert_sum/farm_count_sum* 100, 0),
+         p_DC = round(Demeter_cert_sum/farm_count_sum* 100, 0),
+         p_AWCF = round(animal_welfare_sum/farm_count_sum* 100, 0),
+         p_GF = round(grass_fed_sum/farm_count_sum* 100, 0),
+         p_con = round(conventional_sum/farm_count_sum* 100, 0),
+         p_tra = round(transitional_sum/farm_count_sum* 100, 0),
+         p_kosh = round(kosher_sum/farm_count_sum* 100, 0),
+         p_hal = round(halaal_sum/farm_count_sum* 100, 0),
+         ) %>%
+  rename("Farms" = farm_count_sum,
+         "Naturally Grown" = Naturally_grown_sum,
+         "GAP Certified" = GAP_cert_sum,
+         "Certified Organic" = Cert_organic_sum,
+         "Certified Naturally Grown" = Cert_natgrown_sum,
+         "Integrated Pest Management" = IPM_sum,
+         "ROP Certified" = ROP_cert_sum,
+         "Demeter Certified" = Demeter_cert_sum,
+         "Animal Welfare/Cruelty Free" = animal_welfare_sum,
+         "Grass Fed/Free Range" = grass_fed_sum,
+         "Conventional" = conventional_sum,
+         "Transitional" = transitional_sum,
+         "Kosher" = kosher_sum,
+         "Halaal" = halaal_sum,
+         "Naturally Grown %" = p_NG,
+         "GAP Certified %" = p_GAP,
+         "Certified Organic %" = p_CO,
+         "Certified Naturally Grown %" = p_CNG,
+         "Integrated Pest Management %" = p_IPM,
+         "ROP Certified %" = p_ROP,
+         "Demeter Certified %" = p_DC,
+         "Animal Welfare/Cruelty Free %" = p_AWCF,
+         "Grass Fed %" = p_GF,
+         "Conventional %" = p_con,
+         "Transitional %" = p_tra,
+         "Kosher %" = p_kosh,
+         "Halaal %" = p_hal
+         )
+
+# write state membership and farming practice to a CSV
+#write.csv(LH_state_mfp, "lh_state_mfp.csv")
+
+# make state crop production dataframe
+us_state_prod <- LH_prod %>%
+  group_by(State, Season) %>%
+  summarise_at( vars( colnames(LH_prod[,20:228])), list(sum)) %>%
+  filter(State %in% states48)
+
+# remove crops with 0 producers
+## new df with names of crops
+cnames <- colnames(us_state_prod[,3:211])
+cropnames <- as.data.frame(cnames)
+# get the sum of crop production
+cropnames$csums <- sapply(us_state_prod[,3:211], sum)
+# filter out crops with 0 production
+crops_cut <- cropnames %>% filter(csums != 0)
+# move the names of crops with >0 production into a list
+cutprods <- crops_cut$cnames
+# cut the production dataframe to only include those in our newly created list
+us_state_prod_cut <- us_state_prod %>% select(all_of(cutprods))
+
+# dataframe to get the mean and sd of product diversity
+us_state_prod_div <- LH_prod %>%
+  group_by(State, Season) %>%
+  summarise_at( vars(`Product Diversity`), list(mean, sd)) %>%
+  filter(State %in% states48) %>%
+  rename("Product Diversity mean" = fn1,
+         "Product Diversity sd" = fn2)
+# join product diversity DF to individual product DF
+lh_state_prod <- cbind(us_state_prod_div, us_state_prod_cut[,2:162])
+
+# merge mfp and prod
+lh_state_cleaned <- merge(LH_state_mfp, lh_state_prod, by.x = "State", by.y = "State")
+
+# write csv
+# write_csv(lh_state_cleaned, "lh_state_cleaned.csv")
+```
+
+## City localharvest data
+
+Summarize by city, join to place data
+``` {r city_lh}
+# summarize LH_data and production data by city
+## Summarize data by city and state
+LH_city <- LH_data %>%
+  group_by(City, State) %>%
+  summarise_at(vars(farm_count, Naturally_grown, GAP_cert, Cert_organic, Cert_natgrown, IPM, ROP_cert, Demeter_cert, animal_welfare, grass_fed, conventional, transitional, kosher, halaal), list(sum=sum))
+
+# Add an ID made out of city + state
+LH_city$ID <- paste(LH_city$City, LH_city$State, sep=", ")
+
+# create negative in function
+`%notin%` <- Negate(`%in%`)
+
+LH_city_not <- LH_city %>%
+  filter(ID %notin% cities_cont$ID)
+## trim cities to only those in 'cities' object
+LH_city <- LH_city %>%
+  filter(ID %in% cities_cont$ID)
+
+
+# trim 'cities' object to match the length of LH_data
+tcities <- cities_cont %>%
+  filter(ID %in% LH_city$ID)
+tcities <- tcities[!duplicated(tcities$ID),]
+tcities <- tcities[order(tcities$ID),]
+
+# calculate percents and give everything a neat label
+lh_city_mfp <- LH_city %>%
+    mutate(p_NG = round(Naturally_grown_sum/farm_count_sum * 100, 0),
+         p_GAP = round(GAP_cert_sum/farm_count_sum* 100, 0),
+         p_CO = round(Cert_organic_sum/farm_count_sum* 100, 0),
+         p_CNG = round(Cert_natgrown_sum/farm_count_sum* 100, 0),
+         p_IPM = round(IPM_sum/farm_count_sum* 100, 0),
+         p_ROP = round(ROP_cert_sum/farm_count_sum* 100, 0),
+         p_DC = round(Demeter_cert_sum/farm_count_sum* 100, 0),
+         p_AWCF = round(animal_welfare_sum/farm_count_sum* 100, 0),
+         p_GF = round(grass_fed_sum/farm_count_sum* 100, 0),
+         p_con = round(conventional_sum/farm_count_sum* 100, 0),
+         p_tra = round(transitional_sum/farm_count_sum* 100, 0),
+         p_kosh = round(kosher_sum/farm_count_sum* 100, 0),
+         p_hal = round(halaal_sum/farm_count_sum* 100, 0)
+         ) %>%
+  rename("Farms" = farm_count_sum,
+         "Naturally Grown" = Naturally_grown_sum,
+         "GAP Certified" = GAP_cert_sum,
+         "Certified Organic" = Cert_organic_sum,
+         "Certified Naturally Grown" = Cert_natgrown_sum,
+         "Integrated Pest Management" = IPM_sum,
+         "ROP Certified" = ROP_cert_sum,
+         "Demeter Certified" = Demeter_cert_sum,
+         "Animal Welfare/Cruelty Free" = animal_welfare_sum,
+         "Grass Fed/Free Range" = grass_fed_sum,
+         "Conventional" = conventional_sum,
+         "Transitional" = transitional_sum,
+         "Kosher" = kosher_sum,
+         "Halaal" = halaal_sum,
+         "Naturally Grown %" = p_NG,
+         "GAP Certified %" = p_GAP,
+         "Certified Organic %" = p_CO,
+         "Certified Naturally Grown %" = p_CNG,
+         "Integrated Pest Management %" = p_IPM,
+         "ROP Certified %" = p_ROP,
+         "Demeter Certified %" = p_DC,
+         "Animal Welfare/Cruelty Free %" = p_AWCF,
+         "Grass Fed %" = p_GF,
+         "Conventional %" = p_con,
+         "Transitional %" = p_tra,
+         "Kosher %" = p_kosh,
+         "Halaal %" = p_hal
+         )
+
+# make state crop production dataframe
+lh_city_prod <- LH_prod %>%
+  group_by(City, State, ID, Season) %>%
+  summarise_at( vars( colnames(LH_prod[,20:228])), list(sum)) %>%
+  filter(ID %in% cities_cont$ID)
+
+# cut the production dataframe to only include those in our newly created list
+lh_city_prod_cut <- lh_city_prod %>% select(all_of(cutprods))
+
+# dataframe to get the mean and sd of product diversity
+lh_city_prod_div <- LH_prod %>%
+  group_by(ID, Season) %>%
+  summarise_at( vars(`Product Diversity`), list(mean, sd)) %>%
+  filter(ID %in% cities_cont$ID) %>%
+  rename("Product Diversity mean" = fn1,
+         "Product Diversity sd" = fn2)
+# join product diversity DF to individual product DF
+lh_city_prod <- cbind(lh_city_prod_div, lh_city_prod_cut[,4:164])
+
+# merge membership & farming practices DF with production DF
+lh_city_cleaned <- merge(lh_city_mfp, lh_city_prod, by.x="ID", by.y="ID")
+
+# write city csv
+#write.csv(lh_city_cleaned, "lh_city_cleaned.csv")
+```
