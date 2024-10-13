@@ -38,7 +38,7 @@ GRAPHING
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-require(tidyverse); require(lmerTest); require(showtext); require(scico); require(pwr); require(car); require(ggpubr); require(rstatix); require(ggridges); require(MASS)
+require(tidyverse); require(lme4); require(showtext); require(scico); require(pwr); require(car); require(ggpubr); require(rstatix); require(ggridges); require(MASS)
 
 ```
 
@@ -86,7 +86,7 @@ As a final note, this data has something wrong with it, as there are ~100 gsw va
 ```{r Li_data, include=TRUE, echo=TRUE}
 
 ## Load and clean Li-600 data
-Li_data_file <- "C:/Data/TIP24/TIP24_Fluoro_Data.csv"
+Li_data_file <- "C:/Github/Portfolio/R Shiny Apps/01 Tomato Inoculants 2024/TIP24_LI600.csv"
 Li_data <- read.csv(Li_data_file, stringsAsFactors = T) %>%
   mutate(Treatment = case_when(
           Row==1~"Control",
@@ -156,7 +156,7 @@ Make another pivot table to get the sum of fruit count, mass, and BER, fungus, a
 ```{r Fl_data, include=TRUE, echo=TRUE}
 
 ## Load and clean TIP24 fruit data
-Fl_data_file <- "C:/Data/TIP24/TIP24_Fruit_Data.csv"
+Fl_data_file <- "C:/Github/Portfolio/R Shiny Apps/01 Tomato Inoculants 2024/TIP24_Fruit.csv"
 Fl_data <- read.csv(Fl_data_file, stringsAsFactors = T) %>%
   mutate(Treatment = case_when(
     row==1~"Control",
@@ -615,8 +615,8 @@ Do a generalized linear mixed model with stomatal conductance (gsw) as response,
 ```{r gsw_analysis, include=TRUE, echo=TRUE}
 
 #GLMM with Treatment as explanatory
-summary(gsw_glmm <- (glmer(gsw ~ Treatment + rh_s + (1|plant_fac), 
-                  data=Li_data, family=Gamma(link="log"))))
+#summary(gsw_glmm <- (glmer(gsw ~ Treatment + rh_s + (1|plant_fac), 
+ #                 data=Li_data, family=Gamma(link="log"))))
 
 # GSW by date across relative humidity
 ggplot(data = Li_data, aes(x=as.factor(Date), y = gsw, 
@@ -749,13 +749,13 @@ ggplot(data = Li_data_stats_byplant, aes(x= Treatment, y = gsw_mean, fill=Treatm
 
 # linear mixed model with PhiPS2 as response, Treatment as predictor (explanatory), light (Qamb) as fixed effect, and plant as random effect
 
-summary(model_PhiPS2 <- (lmer(
-  PhiPS2 ~ Treatment + Qamb + (1|plant_fac),
-  data = Li_data)))
+#summary(model_PhiPS2 <- (lmer(
+#  PhiPS2 ~ Treatment + Qamb + (1|plant_fac),
+#  data = Li_data)))
 
-summary(model_PhiPS2_noT <- (lmer(
-  PhiPS2 ~ Qamb + (1|plant_fac),
-  data = Li_data)))
+#summary(model_PhiPS2_noT <- (lmer(
+#  PhiPS2 ~ Qamb + (1|plant_fac),
+#  data = Li_data)))
 
 ## PhiPS2 by date, grouped by treatment
 ggplot(data = Li_data, aes(x=as.factor(Date), y = PhiPS2, color = Treatment,
@@ -1543,16 +1543,16 @@ ggplot(data=Fl_means_byplant, aes(x=Treatment, y=mass_mean, color=Treatment, fil
 ```{r sugar_analysis, include=TRUE, echo=TRUE}
 
 # Linear mixed model of sugar as a function of treatment with plant as a random effect
-summary(model_sugar_no_BER <- (lmer(
-  sugar_avg ~ Treatment + (1| plant_fac),
-  data = Fl_data_no_BER)))
+#summary(model_sugar_no_BER <- (lmer(
+#  sugar_avg ~ Treatment + (1| plant_fac),
+#  data = Fl_data_no_BER)))
 
-summary(lm_sugar_no_BER <- (lm(
-  sugar_avg ~ Treatment,
-  data = Fl_data_no_BER)))
+#summary(lm_sugar_no_BER <- (lm(
+#  sugar_avg ~ Treatment,
+#  data = Fl_data_no_BER)))
 
 #TUKEY (more or less) on the LMER
-difflsmeans(model_sugar_no_BER)
+#difflsmeans(model_sugar_no_BER)
 
 ## plot sugar by treatment as a boxplot with violins and jitter
 ggplot(data=Fl_data_no_BER, aes(x=Treatment, y=sugar_avg, color=Treatment, fill=Treatment))+
