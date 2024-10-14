@@ -9,7 +9,6 @@ library(bslib)
 library(MASS)
 library(ggpubr)
 library(DT)
-library(GWalkR)
 library(rstatix)
 library(lme4)
 library(MuMIn)
@@ -290,10 +289,7 @@ ui <- navbarPage(title = "Tomato Inoculants",
             ))
           )
        ), # end statistical tests panel
-       tabPanel("Tableau-Style Explorer",
-                card(gwalkrOutput("li_gwalk"),
-                     card_body(markdown("For more information on using GWalkR's Tableau-style visualizations please see the author's [Github repo](https://github.com/Kanaries/GWalkR)."))
-                )
+       tabPanel("Data Explorer"
        ),
        tabPanel("Info",
                 card(markdown("Fluorescence measurements were taken biweekly with a LI-COR LI-600 over the course of the trial. Data is presented in a tidy format with each row representing a single observation and each column representing a variable. <br>
@@ -414,10 +410,8 @@ ui <- navbarPage(title = "Tomato Inoculants",
                       )
                     ))) # end sugar
                ),
-      tabPanel("Tableau-Style Explorer",
-        gwalkrOutput("f_gwalk"),
-        card(card_body(markdown("For more information on using GWalkR's Tableau-style visualizations please see the author's [Github repo](https://github.com/Kanaries/GWalkR).")))
-      ),
+      tabPanel("Data Explorer",
+               ),
       tabPanel("Info",
          card(
           card_body(
@@ -954,15 +948,6 @@ server <- function(input, output) {
   ## Test for homoscedasticity
   leveneTest(Fl_data_no_BER$sugar_avg~Fl_data_no_BER$Treatment)
   leveneTest(Fl_data_no_BER$mass~Fl_data_no_BER$Treatment)
-  
-  
-  
-  # GWalkR outputs
-  observeEvent(input$omitna, {
-    output$f_gwalk <- renderGwalkr({gwalkr(RFl_data()[,c(13,1,2,18,3:7,19,8:12,17)])})
-  })
-  output$li_gwalk <- renderGwalkr({gwalkr(RLi_data())})
-  output$f_gwalk <- renderGwalkr({gwalkr(RFl_data()[,c(13,1,2,18,3:7,19,8:12,17)])})
 }
 
 # run app
