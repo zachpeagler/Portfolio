@@ -1,0 +1,14 @@
+Title: 04 Top Baby Names
+ShortName: 04BabyNames
+Date: 2024-10-14
+Lifecycle: experimental
+Authors@R: c(
+    person(given = "Zach", family = "Peagler", email = "zachpeagler00@gmail.com", role = c("aut", "cre")),
+  )
+Description: This app takes data on baby names from Data.gov and plots the top names per year in a scatter plot, as well as a boxplot for the most common and least most common baby names.
+DisplayMode: Normal
+URL: https://github.com/zachpeagler/App-A-Day/tree/main/04_baby_names
+BugReports: https://github.com/zachpeagler/AppADay/issues
+License: MIT
+Tags: R, shiny, ggplot, plotly
+Type: Shiny

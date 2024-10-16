@@ -1,0 +1,14 @@
+Title: 01 Meteorite Landings
+ShortName: 01Met
+Date: 2024-10-12
+Lifecycle: experimental
+Authors@R: c(
+    person(given = "Zach", family = "Peagler", email = "zachpeagler00@gmail.com", role = c("aut", "cre")),
+  )
+Description: This app takes meteorite landing data from Data.gov and plots it on a leaflet map, makes a couple histograms, and features an interactive data viewer.
+DisplayMode: Normal
+URL: https://zachpeagler.shinyapps.io/01_meteorites
+BugReports: https://github.com/zachpeagler/AppADay/issues
+License: MIT
+Tags: R, Shiny, ggplot
+Type: Shiny

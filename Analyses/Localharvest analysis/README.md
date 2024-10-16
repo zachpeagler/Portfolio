@@ -13,9 +13,14 @@ I wrote a Python script to scrape farmer data over the course of several months.
 
 ### Languages
 1. R 
-    tigris, dplyr, ggplot2, sf
+    - tigris 
+    - dplyr
+    - ggplot2
+    - sf
 2. Python
-    requests, BeautifulSoup, pandas
+    - requests
+    - BeautifulSoup
+    - pandas
 3. HTML
 4. CSS 
 5. Javascript
@@ -24,4 +29,3 @@ I wrote a Python script to scrape farmer data over the course of several months.
 1. Scraping publicly available data off the internet
 1. Cleaning data
 2. Combining original data with public databases
-3. 

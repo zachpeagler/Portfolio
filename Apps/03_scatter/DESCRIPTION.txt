@@ -1,0 +1,14 @@
+Title: 03 Scatter
+ShortName: 03Scatter
+Date: 2024-10-13
+Lifecycle: experimental
+Authors@R: c(
+    person(given = "Zach", family = "Peagler", email = "zachpeagler00@gmail.com", role = c("aut", "cre")),
+  )
+Description: This app takes the R built-in dataset iris and plots an interactive scatter plot.
+DisplayMode: Normal
+URL: https://github.com/zachpeagler/App-A-Day/tree/main/03_scatter
+BugReports: https://github.com/zachpeagler/AppADay/issues
+License: MIT
+Tags: R, shiny, ggplot, plotly
+Type: Shiny

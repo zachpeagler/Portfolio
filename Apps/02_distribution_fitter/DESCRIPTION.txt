@@ -1,0 +1,14 @@
+Title: 02 Distribution Fitter
+ShortName: 02DistFit
+Date: 2024-10-13
+Lifecycle: experimental
+Authors@R: c(
+    person(given = "Zach", family = "Peagler", email = "zachpeagler00@gmail.com", role = c("aut", "cre")),
+  )
+Description: This app takes data from Data.gov and fits the distribution of it, as well as doing some kolmogorov-smirnov tests.
+DisplayMode: Normal
+URL: https://github.com/zachpeagler/App-A-Day/tree/main/02_distribution_fitter
+BugReports: https://github.com/zachpeagler/AppADay/issues
+License: MIT
+Tags: R, shiny, ggplot, plotly
+Type: Shiny

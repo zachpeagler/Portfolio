@@ -1,0 +1,13 @@
+name: 02_distribution_fitter
+title: 02_distribution_fitter
+username: zachpeagler
+account: zachpeagler
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 13013291
+bundleId: 9222068
+url: https://zachpeagler.shinyapps.io/02_distribution_fitter/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: 02qrcode_gh.png|02qrcode_s.png|02screenshot.png|README.md

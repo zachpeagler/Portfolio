@@ -1,0 +1,14 @@
+Title: 05 Baby Names Percent Change Per Year
+ShortName: 05BabyNamesPCY
+Date: 2024-10-15
+Lifecycle: experimental
+Authors@R: c(
+    person(given = "Zach", family = "Peagler", email = "zachpeagler00@gmail.com", role = c("aut", "cre")),
+  )
+Description: This app takes data on baby names from Data.gov and plots the name's percent change by year.
+DisplayMode: Normal
+URL: https://github.com/zachpeagler/App-A-Day/tree/main/05_name_change
+BugReports: https://github.com/zachpeagler/AppADay/issues
+License: MIT
+Tags: R, shiny, ggplot, plotly
+Type: Shiny
