@@ -9,7 +9,6 @@ library(bslib)
 library(MASS)
 library(ggpubr)
 library(DT)
-library(GWalkR)
 library(rstatix)
 library(lme4)
 library(MuMIn)
@@ -289,6 +288,7 @@ ui <- navbarPage(title = "Tomato Inoculants",
             ))
           )
        ), # end statistical tests panel
+       tabPanel("Data Explorer"
        tabPanel("Data Explorer"
        ),
        tabPanel("Info",
