@@ -17,8 +17,8 @@ An app that takes the cleaned data from Localharvest and creates both a map and 
 
 ### Screenshots
 #### Map with value boxes
-![App Screenshot 1](/R%20Shiny%20Apps/03%20US%20State%20Family%20Farm%20Products/03_screenshot_map.png)
+![App Screenshot 1](/Apps/06_state_family_farm_products/03_screenshot_map2.png)
 
 #### Bar plots
-![App Screenshot 2](/R%20Shiny%20Apps/03%20US%20State%20Family%20Farm%20Products/03_screenshot_bars.png)
+![App Screenshot 2](/Apps/06_state_family_farm_products/03_screenshot_bars2.png)
 

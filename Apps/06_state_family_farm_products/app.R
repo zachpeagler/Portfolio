@@ -92,7 +92,7 @@ ui <- navbarPage("US State Family Farm Products",
          ), col_widths = c(9, 3)
          )
          ),
-    card(card_body("For family farms in the 48 continental United States. 
+    card(card_body("For family farms in the 48 continental United States.
                      Data from localharvest (2024) and tigris (2022)")
     )
     ),
@@ -123,7 +123,7 @@ ui <- navbarPage("US State Family Farm Products",
 
 # server
 server <- function(input, output) {
-  
+
   # reactive variables
   Rseason <- reactive({input$season})
   Rprod <- reactive({input$product})
@@ -149,7 +149,7 @@ server <- function(input, output) {
     # filter the data to only be the selected season
     us_st_season <- us_st_prod %>% filter(Season == Rseason())
     move_states_season <- move_states %>% filter(Season == Rseason())
-    
+
     if (Rfwrap() == FALSE) {
       # generate plot
       p <- ggplot(us_st_season, aes(fill=.data[[Rprod()]]))+
@@ -170,12 +170,12 @@ server <- function(input, output) {
  # end theme
       if (Rlab() == TRUE) {
         p <- p + geom_label(data = filter(us_st_season, !NAME %in% move_labels),
-                    aes(x = lon, y = lat, label = .data[[Rprod()]]), fill = "grey90", 
-                    family = "mont", size = 5) +
+                    aes(x = lon, y = lat, label = .data[[Rprod()]]), fill = "grey90",
+                    family = "mont", size = 6) +
            geom_label(data = move_states_season,
                       aes(x = xend, y = yend,
                           label = paste(STUSPS, .data[[Rprod()]], sep=": ")), fill = "grey90",
-                          family = "mont", size = 5, hjust = 0) +
+                          family = "mont", size = 6, hjust = 0) +
            geom_segment(data = move_states_season,
                         aes(lon, lat, xend = xend, yend = yend),
                         colour = "grey60", fill=NA, linewidth = 0.3)+
@@ -205,24 +205,26 @@ server <- function(input, output) {
         )
       if (Rlab() == TRUE) {
           p <- p + geom_label(data = filter(us_st_prod, !NAME %in% move_labels),
-                            aes(x = lon, y = lat, label = .data[[Rprod()]]), fill = "grey90", 
-                            family = "mont", size = 5) +
+                            aes(x = lon, y = lat, label = .data[[Rprod()]]), fill = "grey90",
+                            family = "mont", size = 6) +
                   geom_label(data = move_states,
                               aes(x = xend, y = yend,
                                   label = paste(STUSPS, .data[[Rprod()]], sep=": ")), fill = "grey90",
-                                  family = "mont", size = 5, hjust = 0) +
+                                  family = "mont", size = 6, hjust = 0) +
                   geom_segment(data = move_states,
                                 aes(lon, lat, xend = xend, yend = yend),
                                 colour = "grey60", fill=NA, linewidth = 0.3)+
-                  xlim(-125, -60)
+                  xlim(-125, -60)+
+            theme(text = element_text(size=16, family="mont")
+)
       } # end label if
     } # end frwap if
     print(p)
   }) ## end map output renderPlot
-  
+
   # barplot
   output$bar_top <- renderPlot({
-    # plot  
+    # plot
     ggplot(Rtopprod(), aes(x= reorder(NAME, -.data[[Rprod()]]), y=.data[[Rprod()]], fill =.data[[Rprod()]]))+
       geom_col()+
       ylab(paste(Rprod(), "producing farm count", sep = " "))+
@@ -241,7 +243,7 @@ server <- function(input, output) {
   }) # end barplot
   # barplot2
   output$bar_bot <- renderPlot({
-    # plot  
+    # plot
     ggplot(Rtopperprod(), aes(x= reorder(NAME, -PCT), y=PCT, fill =PCT))+
       geom_col()+
       ylab(paste(Rprod(), "producing farm percent", sep = " "))+
@@ -261,7 +263,7 @@ server <- function(input, output) {
   output$DT_topprod <- renderDT({
     Rtopprod()
   })
-  
+
   output$DT <- renderDT({
     us_st_prod
   })
