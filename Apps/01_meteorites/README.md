@@ -1,7 +1,7 @@
 # Meteorite Landings App
 [![License: MIT](https://img.shields.io/badge/License-MIT-lightgrey.svg)](https://opensource.org/license/mit)
 ![experimental](https://img.shields.io/badge/lifecycle-maturing-lightblue)
-![year](https://img.shields.io/badge/year-2024-darkblue)
+![year](https://img.shields.io/badge/year-2024-blue)
 
 ## Description
 
@@ -25,7 +25,7 @@ When you click on a circle on the map with leaflet, a value card pops up showing
 ![App Screenshot](01_screenshot_map.png)
 
 #### Popup
-![App Screenshot 3](/01_meteorites/01_screenshot_popup.png)
+![App Screenshot 3](/Apps/01_meteorites/01_screenshot_popup.png)
 
 #### Plot Panel
 ![App Screenshot 2](01_screenshot_plots.png)

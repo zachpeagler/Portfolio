@@ -1,7 +1,7 @@
 # Distribution Fitter
 [![License: MIT](https://img.shields.io/badge/License-MIT-lightgrey.svg)](https://opensource.org/license/mit)
 ![experimental](https://img.shields.io/badge/lifecycle-experimental-orange)
-![year](https://img.shields.io/badge/year-2024-darkblue)
+![year](https://img.shields.io/badge/year-2024-blue)
 
 ## Description
 I wanted to make a useful function that will help me in all my analyses down the line, a distribution fitting function!. No doubt these already exist, but making one specific to my needs is a great exercise and who knows, maybe it'll actually be good and I can release it as a package on CRAN or something.

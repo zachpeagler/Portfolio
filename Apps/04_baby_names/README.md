@@ -1,8 +1,7 @@
 # Top Baby Names App
 [![License: MIT](https://img.shields.io/badge/License-MIT-lightgrey.svg)](https://opensource.org/license/mit)
 ![experimental](https://img.shields.io/badge/lifecycle-experimental-orange)
-![year](https://img.shields.io/badge/year-2024-darkblue)
-![new](https://img.shields.io/badge/lifecycle-new-brightgreen)
+![year](https://img.shields.io/badge/year-2024-blue)
 
 ## Description
 An app looking at the most popular baby names by year and gender as a bar plot. I also added a scatter plot showing the change in a name's popularity over time.

@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-lightgrey.svg)](https://opensource.org/license/mit)
 ![experimental](https://img.shields.io/badge/lifecycle-experimental-orange)
 ![year](https://img.shields.io/badge/year-2024-blue)
-![new](https://img.shields.io/badge/lifecycle-new-brightgreen)
+
 ## Description
 
 An app that takes the cleaned data from Localharvest and creates both a map and two reactive barplots. There are user inputs for product, palette, adding individual maps for each season, season, labels, and bar plot bin selection.

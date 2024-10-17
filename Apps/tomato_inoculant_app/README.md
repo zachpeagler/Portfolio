@@ -1,16 +1,20 @@
 # Tomato Inoculants 2024
 
-[![License: CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-blue.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/) 
+[![License: MIT](https://img.shields.io/badge/License-MIT-lightgrey.svg)](https://opensource.org/license/mit)
 ![experimental](https://img.shields.io/badge/lifecycle-experimental-orange)
-![year](https://img.shields.io/badge/year-2024-darkblue)
-![new](https://img.shields.io/badge/age-new-brightgreen)
+![year](https://img.shields.io/badge/year-2024-blue)
 
-![App Screenshot](../01%20Tomato%20Inoculants%202024/screenshot.png)
+## Description
+An R Shiny app created as part of my Master's thesis at Kennesaw State University. It is a comprehensive analysis of a 7 month trial.
 
 ## Links
 [Link to app](https://zachpeagler.shinyapps.io/01_tomato_inoculants)
 
 ![QRCode](../01%20Tomato%20Inoculants%2020204/qrcode.png)
+
+### Screenshots
+![App Screenshot](../01%20Tomato%20Inoculants%202024/screenshot.png)
+
 
 # Introduction
 
