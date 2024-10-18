@@ -25,7 +25,7 @@ font_add_google("Montserrat", family = "mont")
 showtext_auto()
 ## shapes
 four_shapes = c(15,16,17,23)
-# load data 
+# load data
 ## li600 data
 Li_data_file <- "TIP24_LI600.csv"
 Li_data <- read.csv(Li_data_file, stringsAsFactors = T) %>%
@@ -41,7 +41,7 @@ Li_data <- read.csv(Li_data_file, stringsAsFactors = T) %>%
          Date = as.factor(Date),
          Date_num = as.numeric(Date),
          plant_fac = as.factor(paste(Row, Pot, sep="_")),
-         Treatment = factor(Treatment, levels=c("Control", "Germination", 
+         Treatment = factor(Treatment, levels=c("Control", "Germination",
                                                 "Transplantation", "Germ+Trans")),
          Treatment_num = as.numeric(Row)
          )
@@ -73,7 +73,7 @@ Fl_data <- read.csv(Fl_data_file, stringsAsFactors = T) %>%
     d_analysis = format(date_analysis, format="%d"),
     d_diff = abs(as.integer(d_analysis)-as.integer(d_harvest)),
     plant_fac = as.factor(paste(row, plant)),
-    Treatment = factor(Treatment, levels=c("Control","Germination", 
+    Treatment = factor(Treatment, levels=c("Control","Germination",
                                            "Transplantation",
                                            "Germ+Trans")),
     BER = as.factor(BER),
@@ -134,26 +134,26 @@ ui <- navbarPage(title = "Tomato Inoculants",
                       theme = value_box_theme(bg = sls8[1]),
                       title = "Normal p-value",
                       value = textOutput("gsw_nks_p"),
-                      p("P-value < 0.05, indicating that the distribution of 
+                      p("P-value < 0.05, indicating that the distribution of
                         gsw is significantly different from the normal distribution.")
                     ),
                     value_box(
                       theme = value_box_theme(bg = sls8[2]),
                       title = "Log-normal p-value",
                       value = textOutput("gsw_lnks_p"),
-                      p("P-value < 0.05, indicating that the distribution of 
+                      p("P-value < 0.05, indicating that the distribution of
                         gsw is significantly different from the log-normal distribution.")
                     ),
                     value_box(
                       theme = value_box_theme(bg = sls8[3]),
                       title = "Gamma p-value",
                       value = textOutput("gsw_gks_p"),
-                      p("P-value < 0.05, indicating that the distribution of 
+                      p("P-value < 0.05, indicating that the distribution of
                         gsw is significantly different from the Gamma distribution.")
                     )
                   ))),
              card(card_body("Based on the above analysis, we can proceed under the assumption
-       that stomatal conductance follows either log normal or 
+       that stomatal conductance follows either log normal or
        gamma distribution."))
                 ),
        card(card_header("Efficiency of Photosystem II (PhiPS2)",
@@ -181,26 +181,26 @@ ui <- navbarPage(title = "Tomato Inoculants",
                      theme = value_box_theme(bg = sls8[5]),
                      title = "Normal p-value",
                      value = textOutput("phi_nks_p"),
-                     p("P-value < 0.05, indicating that the distribution of 
+                     p("P-value < 0.05, indicating that the distribution of
                        PhiPS2 is significantly different from the normal distribution.")
                    ),
                    value_box(
                      theme = value_box_theme(bg = sls8[6]),
                      title = "Log-normal p-value",
                      value = textOutput("phi_lnks_p"),
-                     p("P-value < 0.05, indicating that the distribution of 
+                     p("P-value < 0.05, indicating that the distribution of
                        PhiPS2 is significantly different from the log-normal distribution.")
                    ),
                    value_box(
                      theme = value_box_theme(bg = sls8[7]),
                      title = "Gamma p-value",
                      value = textOutput("phi_gks_p"),
-                     p("P-value < 0.05, indicating that the distribution of 
+                     p("P-value < 0.05, indicating that the distribution of
                        PhiPS2 is significantly different from the Gamma distribution.")
                    )
                  )),
                  card_body("Based on the above, it appears that PhiPS2 is significantly different from
-       normal, log-normal, and gamma distributions. I'm at a loss as to 
+       normal, log-normal, and gamma distributions. I'm at a loss as to
        how it is distributed. Bayesian inference may be required here."))
             ))
        ), # end distributions tab
@@ -289,11 +289,10 @@ ui <- navbarPage(title = "Tomato Inoculants",
           )
        ), # end statistical tests panel
        tabPanel("Data Explorer"
-       tabPanel("Data Explorer"
        ),
        tabPanel("Info",
                 card(markdown("Fluorescence measurements were taken biweekly with a LI-COR LI-600 over the course of the trial. Data is presented in a tidy format with each row representing a single observation and each column representing a variable. <br>
-       ### Explanatory Variables   
+       ### Explanatory Variables
           **Treatment** is the inoculation timing of the tomato. Options are Control, Germination, Transplantation, and Germ+Trans. <br>
           **Time** is the time at which the measurement was taken. <br>
           **Date** is the date at which the measurement was taken. <br>
@@ -303,7 +302,7 @@ ui <- navbarPage(title = "Tomato Inoculants",
           **rh_s** is the relative humidity (add units) of the leaf. <br>
           **Tleaf** is the temperature (C) of the leaf. <br>
           **Qamb** is the ambient light level (add units) at the time of the observation.
-       ### Response Variables   
+       ### Response Variables
           **gsw** is the stomatal conductance (mol m-2 s-1) of the leaf. <br>
           **VPDleaf** is the vapor pressure deficit (add units) of the leaf. <br>
           **PhiPS2** is the efficiency of photosystem II of the leaf. It is unitless. (0:1) <br>
@@ -311,7 +310,7 @@ ui <- navbarPage(title = "Tomato Inoculants",
        )
      ) # end tab set
    ), # end fluorescence page
-   
+
   nav_panel("Fruit",
     tabsetPanel(
       tabPanel("Distributions",
@@ -413,7 +412,7 @@ ui <- navbarPage(title = "Tomato Inoculants",
          card(
           card_body(
             markdown("The tomatoes were grown in 4 rows of 12 pots each, with each row corresponding to a different inoculation treatment. The data table below is formatted in a tidy format with each row corresponding to one fruit and each column representing a variable.<br>
-                      ### Explanatory Variables <br> 
+                      ### Explanatory Variables <br>
                       **Treatment** is the inoculation timing of the tomato. Options are Control, Germination, Transplantation, and Germ+Trans. <br>
                       **row** is the row number of the tomato. (1:4) <br>
                       **plant** is the pot number of the tomato. (1:12) <br>
@@ -478,7 +477,7 @@ server <- function(input, output) {
     }
     return(f)
   })
-### Reactive GLMs 
+### Reactive GLMs
 #### gsw
   Rgsw_glm_gamma <- reactive({
     glmer(gsw ~ Treatment + rh_s + (1 | plant_fac),
@@ -505,7 +504,7 @@ server <- function(input, output) {
   gsw_ln <- fitdistr(Li_data$gsw, "lognormal")
   gsw_g <- fitdistr(Li_data$gsw, "gamma")
   gsw_seq <- seq(min(Li_data$gsw), max(Li_data$gsw), by=0.001)
-  
+
   ### test gsw for gamma and plnorm distributions using ks test
   gsw_gks <- ks.test(Li_data$gsw, "pgamma",shape=gsw_g$estimate[1],
                                   rate=gsw_g$estimate[2])
@@ -537,7 +536,7 @@ server <- function(input, output) {
   output$gsw_nks_p <- renderText({
     gsw_nks_p
   })
-  
+
 ## PDFs
   gsw_pdf_n <- dnorm(gsw_seq, mean=gsw_n$estimate[1],
                      sd=gsw_n$estimate[2])
@@ -576,7 +575,7 @@ server <- function(input, output) {
   gsw_cdf_g <- pgamma(gsw_seq, shape=gsw_g$estimate[1],
                       rate=gsw_g$estimate[2])
   gsw_cdf <- ecdf(Li_data$gsw)(gsw_seq)
-  
+
   gsw_cdf_df <- as.data.frame(gsw_seq) %>%
     mutate(cdf_ln = gsw_cdf_ln,
            cdf_n = gsw_cdf_n,
@@ -600,7 +599,7 @@ server <- function(input, output) {
         axis.title = element_text(size=24, family = "mont", face= "bold"),
       )
   })
-  
+
 ## PhiPS2 distribution
   PhiPS2_n <- fitdistr(Li_data$PhiPS2, "normal")
   PhiPS2_ln <- fitdistr(Li_data$PhiPS2, "lognormal")
@@ -703,7 +702,7 @@ server <- function(input, output) {
   })
 ## Fluoro interactive scatter plot
   output$fluoro_scatter <- renderPlot({
-    fs <- ggplot(data = RLi_data(), aes(x=.data[[Rfluoro_x()]], y = .data[[Rfluoro_y()]], 
+    fs <- ggplot(data = RLi_data(), aes(x=.data[[Rfluoro_x()]], y = .data[[Rfluoro_y()]],
                                color = .data[[Rfluoro_col()]])) +
             geom_jitter(width=Rfluoro_jit())+
             scale_color_scico(begin=0.8, end=0, palette=Rpalette())+
@@ -738,7 +737,7 @@ server <- function(input, output) {
         title = element_text(size=30, family="open", face="bold")
       )
     if (Rfluoro_box_stats() == TRUE) {
-      gbox <- gbox + 
+      gbox <- gbox +
         stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Transplantation", "Germination"), c("Transplantation", "Germ+Trans"), c("Germination", "Germ+Trans")), size=8, family="mont")+
         stat_compare_means(label.x=3, size=8,family="mont")
     }
@@ -761,7 +760,7 @@ server <- function(input, output) {
         title = element_text(size=30, family="open", face="bold")
       )
     if (Rfluoro_box_stats() == TRUE) {
-      pbox <- pbox + 
+      pbox <- pbox +
         stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Transplantation", "Germination"), c("Transplantation", "Germ+Trans"), c("Germination", "Germ+Trans")), size=8, family="mont")+
         stat_compare_means(label.x=3, size=8,family="mont")
     }
@@ -787,7 +786,7 @@ server <- function(input, output) {
     mass_n <- fitdistr(Fl_data$mass, "normal")
   mass_ln <- fitdistr(Fl_data$mass, "lognormal")
   mass_g <- fitdistr(Fl_data$mass, "gamma")
-  
+
   mass_seq <- seq(min(Fl_data$mass), max(Fl_data$mass), by=0.1)
   mass_pdf_n <- dnorm(mass_seq, mean=mass_n$estimate[1],
                       sd=mass_n$estimate[2])
@@ -796,12 +795,12 @@ server <- function(input, output) {
   mass_pdf_g <- dgamma(mass_seq, shape=mass_g$estimate[1],
                        rate=mass_g$estimate[2])
   mass_pdf <- density(Fl_data$mass, n=length(mass_pdf_ln))
-  
+
   mass_pdf_df <- as.data.frame(mass_seq) %>%
     mutate(pdf_ln = mass_pdf_ln,
            pdf_n = mass_pdf_n,
            pdf_g = mass_pdf_g)
-  
+
   ## CDFs
   mass_cdf_n <- pnorm(mass_seq, mean=mass_n$estimate[1],
                       sd=mass_n$estimate[2])
@@ -810,13 +809,13 @@ server <- function(input, output) {
   mass_cdf_g <- pgamma(mass_seq, shape=mass_g$estimate[1],
                        rate=mass_g$estimate[2])
   mass_cdf <- ecdf(Fl_data$mass)(mass_seq)
-  
+
   mass_cdf_df <- as.data.frame(mass_seq) %>%
     mutate(cdf_ln = mass_cdf_ln,
            cdf_n = mass_cdf_n,
            cdf_g = mass_cdf_g,
            cdf = mass_cdf)
-  
+
   ## Plot Mass PDF
   ggplot(mass_pdf_df)+
     geom_point(aes(x=mass_seq, y=pdf_n, color="Normal"))+
@@ -834,7 +833,7 @@ server <- function(input, output) {
       axis.title = element_text(size=24, family = "mont", face= "bold"),
       title = element_text(size=30, family="open", face="bold", lineheight = .5)
     )
-  
+
   ## Plot Mass CDF
   ggplot(mass_cdf_df)+
     geom_point(aes(x=mass_seq, y=cdf_n, color="Normal"))+
@@ -852,13 +851,13 @@ server <- function(input, output) {
       axis.title = element_text(size=24, family = "mont", face= "bold"),
       title = element_text(size=30, family="open", face="bold", lineheight = .5)
     )
-  
+
   ### test mass for gamma and plnorm distributions using ks test
   ks.test(Fl_data$mass, "pgamma",shape=mass_g$estimate[1],
           rate=mass_g$estimate[2])
   ks.test(Fl_data$mass, "plnorm",meanlog=mass_ln$estimate[1],
           sdlog=mass_ln$estimate[2])
-  
+
 
 
   ## Test for homoscedasticity
