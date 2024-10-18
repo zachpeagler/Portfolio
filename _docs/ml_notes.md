@@ -44,3 +44,36 @@ Weird, prone to interference. Starts by assigning each point its own cluster, th
 dimensionality reduction!
 
 > prcomp(data[, variables])
+
+### t-distributed stochastic neighbor embedding (t-SNE)
+t-SNE is a non-linear dimensionality reduction technique particularly suited for high dimensional data
+
+>library("Rtsne") <br>
+uiris <- unique(iris[, 1:5])<br>
+iristsne <- Rtsne(uiris[, 1:4])<br>
+plot(iristsne$Y, col = uiris$Species) <br>
+
+t-SNE has two important parameters: **perplexity** and **iterations**, the number of iterations before clustering stops.
+
+## Supervised Learning
+
+In supervised learning, the learning algorithm is presented with labelled example inputs, where the labels indicate the desired output.
+Composed of **classification**, where the output is qualitative, and **regression**, where the output is quantitative.
+
+With 2 groups, **binary classification** is used. With more than two groups, we use **multi-label classification**.
+
+### k-nearest neighbors (kNN)
+kNN works by directly measuring the distance between observations and *inferring* the class of unlabelled data from the class of its nearest neighbors.
+
+>set.seed(12L)
+train <- sample(150, 50)
+test <- sample(150, 50)
+library("class")
+knnres <- knn(iris[train, -5], iris[test, -5], iris$Species[train])
+head(knnres)
+
+### Model Performance
+
+Supervised learning is nice in that we can directly evaluate a model's performance based on the known data. For regression, we use the **root mean squared error** (RMSE) and in classification we use **model prediction accuracy**. 
+
+Try not to calculate performance metrics on the data used to calculate the model. This causes in-sample error and leads to over-fitting. Instead, take your data and split it in half, then use one half to train the model and the other half to test and validate the model performace.

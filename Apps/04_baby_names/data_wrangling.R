@@ -1,7 +1,7 @@
 # Baby Name Wrangling
 library(tidyverse)
 ## set working directory
-setwd("C:/Github/App-A-Day/04_baby_names")
+setwd("C:/Github/Portfolio/_data/baby_names")
 ## get all .txt files in directory
 dir <- list.files(pattern="\\.txt$")
 ## read txt files, separating by comma
@@ -38,6 +38,11 @@ for (x in yr_range) {
   newdata <- rbind(fdat, mdat)
   datjoin <- rbind(datjoin, newdata)
 }
+
+## random name sample
+rnames <- as.data.frame(sample(datjoin$Name, 30)) %>%
+  rename(Name = "sample(datjoin$Name, 30)")
+write.csv(rnames, "sc_testdata.csv")
 
 ## write to a csv
 write.csv(datjoin, "Top50BabyNames1880to2024.csv")
