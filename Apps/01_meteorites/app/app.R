@@ -13,7 +13,7 @@ library(plotly)
 library(DT)
 # Load Data
 #meteorite_file <- "C:/Github/App-A-Day/01_meteorites/Meteorite_Landings.csv"
-meteorite_file <- "Meteorite_Landings.csv"
+meteorite_file <- "https://raw.githubusercontent.com/zachpeagler/Portfolio/refs/heads/main/_data/Meteorite_Landings.csv"
 # Rename variables for clarity and omit NAs
 met_dat <- read.csv(meteorite_file) %>%
   rename(mass = mass..g.,
