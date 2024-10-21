@@ -7,7 +7,6 @@ library("tidyverse")
 # test data
 tdata <- read.csv("C:/Github/Portfolio/Apps/seating_chart/sc_testdata.csv")
 
-
 # UI
 ui <- fluidPage(
   titlePanel("Seating Chart"),
@@ -64,7 +63,7 @@ server <- function(input, output, session) {
     print("Grid after assigning front-row students:")
     print(grid)
     
-    # --- Part 2: Assign Remaining Students ---
+    # --- Part 2: Assign Group Students ---
     other_students <- students %>% filter(frontRow == FALSE)  # Non-front-row students
     remaining_seats <- which(is.na(grid), arr.ind = TRUE)  # Get remaining empty seats
     remaining_seats <- remaining_seats[order(remaining_seats[,1], decreasing = FALSE),]
@@ -85,7 +84,9 @@ server <- function(input, output, session) {
     print("Grid after assigning remaining students:")
     print(grid)
     
-    # --- Part 3: Fill Empty Seats with "Empty" ---
+    # --- Part 3: Assign Remaining Students ---
+    
+    # --- Part 4: Fill Empty Seats with "Empty" ---
     empty_seats <- which(is.na(grid), arr.ind = TRUE)  # Get remaining empty seats
     for (i in seq_len(nrow(empty_seats))) {
       seat <- empty_seats[i, ]
@@ -142,10 +143,10 @@ server <- function(input, output, session) {
         # Use different symbols for front row students
         if (student_positions$name[i] %in% seating$data$name[seating$data$frontRow == TRUE]) {
           # Plot with a star for front row students
-          points(student_positions$x[i], student_positions$y[i], pch = 8, col = seat_color, cex = 2)  # Star symbol
+          points(student_positions$x[i], student_positions$y[i], pch = 0, col = seat_color, cex = 7)
         } else {
           # Plot regular point for others
-          points(student_positions$x[i], student_positions$y[i], pch = 21, col = seat_color, bg = seat_color, cex = 2)  # Circle symbol
+          points(student_positions$x[i], student_positions$y[i], pch = 0, col = seat_color, cex = 7)
         }
         
         # Add the text label
