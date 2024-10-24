@@ -1,0 +1,800 @@
+---
+title: "TIP24 Analysis"
+author: "Zach Peagler"
+date: "2024-06-04"
+output: html_document
+---
+
+```{r setup, include=TRUE}
+knitr::opts_chunk$set(echo = TRUE)
+require(tidyverse); require(lmerTest); require(viridis); require(showtext); require(scico); require(pwr); require(car); require(ggpubr); require(rstatix)
+
+```
+
+# Load Data
+
+## Li-600 Data
+
+```{r Li_data, include=TRUE}
+
+# convert strings to factors when loading the data
+# and rename the original date column (for comparison) and create
+# a new "Date" column that is formatted to POSIXct (a date format in R)
+# and a "Plant" column that provides an identifier for each sample (Row+Column)
+# and relevel Treatment to have "Control" as the reference
+
+Li_data_file <- "C:/Data/TIP24/TIP24_Fluoro_Data.csv"
+Li_data <- read.csv(Li_data_file, stringsAsFactors = T) %>%
+  mutate(Treatment = case_when(
+          Row==1~"Control",
+          Row==2~"Transplantation",
+          Row==3~"Germination",
+          Row==4~"Germ+Trans",
+          TRUE~NA)) %>%
+  filter(leak_pct<5, gsw>0, gsw<10) %>%
+  rename(Date_ref = Date) %>%
+  mutate(Date = parse_date_time(Date_ref, orders = "mdy"),
+         Plant = as.factor(paste(Row, Pot)),
+         Treatment = relevel(factor(Treatment), ref = "Control"))
+
+Li_gsw_outliers <- identify_outliers(data.frame(Li_data$gsw))
+Li_PhiPS2_outliers <- identify_outliers(data.frame(Li_data$PhiPS2))
+
+
+# New dataframe of Li_data Avgs and Standard Deviation for stomatal conductance (gsw) and Photosystem II efficiency (PhiPS2), grouped by Treatment and date.
+
+Li_data_stats <- Li_data %>%
+  group_by(Treatment, Date) %>%
+  summarise_at(vars(gsw, PhiPS2), list(mean=mean, sd=sd))
+
+Li_data_stats_byplant <- Li_data %>%
+  group_by(Plant) %>%
+  summarise_at(vars(gsw, PhiPS2), list(mean=mean, sd=sd))
+```
+
+## Fruit Lab Data
+
+```{r FL_data, include=TRUE}
+
+## Create Fruit lab data file from known file name and location
+# Read csv with strings as factors then create treatment groups
+# create "fruit" column to use for counting later
+# create date references then convert dates to POSIXct
+# create day variables then calculate difference in days from harvest to analysis
+# create plant_fac as a unique ID to each plant
+# relevel treatment to have Control as the reference
+
+FL_data_file <- "C:/Data/TIP24/TIP24_Fruit_Data.csv"
+FL_data <- read.csv(FL_data_file, stringsAsFactors = T) %>%
+  mutate(Treatment = case_when(
+    row==1~"Control",
+    row==2~"Transplantation",
+    row==3~"Germination",
+    row==4~"Germ+Trans",
+    TRUE~NA)) %>%
+  mutate(fruit = 1,
+         date_analysis_ref = date_analysis,
+         date_harvest_ref = date_harvest,
+         date_analysis = parse_date_time(date_analysis_ref, orders = "mdy"),
+         date_harvest = parse_date_time(date_harvest_ref, orders="mdy"),
+         d_harvest = format(date_analysis, format="%d"),
+         d_analysis = format(date_harvest, format="%d"),
+         d_diff = abs(as.integer(d_analysis)-as.integer(d_harvest)),
+         plant_fac = as.factor(paste(row, plant)),
+         Treatment = factor(Treatment, levels=c("Control", "Germination", 
+                                                "Transplantation", "Germ+Trans"))
+         )
+
+## Filter out all rows without sugar_avg
+FL_data_no_BER <- FL_data %>%
+  filter(BER==0 & sugar_avg > 0) %>%
+  mutate(pen_mapped = penetrometer/max(penetrometer),
+         ripeness = abs(1-pen_mapped)
+         )
+
+## Filter to only those where BER is equal to 1
+FL_data_BER <- FL_data %>%
+  filter(BER==1)
+
+## Make summary DFs with mean and sd.
+
+FL_data_stats <- FL_data %>%
+  group_by(Treatment) %>%
+  summarise_at(vars(mass, sugar_avg), list(mean=mean, sd=sd))
+
+FL_data_summary <- FL_data %>%
+  group_by(Treatment) %>%
+  summarise_at(vars(fruit, BER, fungus, cracking, mass), list(sum=sum))
+
+FL_data_no_BER_stats <- FL_data_no_BER %>%
+  group_by(Treatment) %>%
+  summarise_at(vars(mass, sugar_avg), list(mean=mean, sd=sd))
+
+
+```
+
+# Colors and Fonts
+
+## Colors
+
+```{r colors, include=TRUE}
+
+a_palette <- "bilbao"
+## it's a good idea to use n+1 for palettes as often the last color is white (invisible against the default background)
+two_colors = scico(3, palette=a_palette)
+four_colors = scico(5, palette=a_palette)
+true_two_col = scico(2, palette=a_palette)
+
+```
+
+## Fonts
+
+```{r fonts, include=TRUE}
+
+font_add_google("Open Sans", family = "open")
+font_add_google("Montserrat", family = "mont")
+showtext_auto()
+
+```
+
+# Analyses
+
+## Li-600 Analysis
+
+```{r Li_analysis, include=TRUE}
+
+# PhiPS2 by date
+
+ggplot(data = Li_data, aes(x= Date, y = PhiPS2, color = Treatment)) +
+  geom_jitter(width=2)+
+  scale_color_manual(values=four_colors)+
+      theme_minimal()+
+  #facet_wrap(~Plant)+
+  ylab("PhiPS2")+
+  xlab("Treatment")+
+  labs(
+    title=str_wrap("PhiPS2 By Date Across Microbial Treatments in Tomato", 40)
+  )+
+  theme(
+    text = element_text(size=24, family="mont"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+# PhiPS2 by temp
+
+ggplot(data = Li_data, aes(x= Tleaf, y = PhiPS2, color = Treatment)) +
+  geom_point()+
+  scale_color_manual(values=four_colors)+
+      theme_minimal()+
+  #facet_wrap(~Plant)+
+  ylab("PhiPS2")+
+  xlab("Temperature")+
+  labs(
+    title=str_wrap("PhiPS2 By Temperature Across Microbial Treatments in Tomato", 40)
+  )+
+  theme(
+    text = element_text(size=24, family="mont"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+# GSW by date
+
+ggplot(data = Li_data, aes(x= Date, y = gsw, color = Treatment)) +
+  geom_jitter(width=1)+
+      scale_color_manual(values=four_colors)+
+    theme_minimal()+
+  ylab("Stomatal Conductance (mol m-2 s-1)")+
+  xlab("Date")+
+  labs(
+    title=str_wrap("Stomatal Conductance Across Dates for Inoculation Treatments in Tomato", 40)
+  )+
+  theme(
+    text = element_text(size=24, family="mont"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+# GSW by temp
+
+ggplot(data = Li_data, aes(x= Tleaf, y = gsw, color = Treatment)) +
+  geom_point()+
+  scale_color_manual(values=four_colors)+
+      theme_minimal()+
+  #facet_wrap(~Plant)+
+  ylab("Stomatal Conductance (mol m-2 s-1)")+
+  xlab("Temperature")+
+  labs(
+    title=str_wrap("Stomatal Conductance By Temperature Across Microbial Treatments in Tomato", 40)
+  )+
+  theme(
+    text = element_text(size=24, family="mont"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+
+# PhiPS2 by Treatment
+
+ggplot(data = Li_data, aes(x= Treatment, y = PhiPS2, fill=Treatment, color=Treatment)) +
+  geom_violin(alpha=0.5, width=1)+
+  geom_boxplot(alpha=.8, width=0.25)+
+  geom_jitter( width=.2, height=0)+
+  scale_color_manual(values=four_colors)+
+  scale_fill_manual(values=four_colors)+
+  theme_minimal()+
+  ylab("PhiPS2")+
+  xlab("Treatment")+
+  labs(
+    title="PhiPS2 Across Inoculation Treatments in Tomato"
+  )+
+  theme(
+    legend.position = "none",
+    text = element_text(size=24, family="mont"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+# GSW by Treatment
+
+ggplot(data = Li_data, aes(x= Treatment, y = gsw, fill=Treatment, color=Treatment)) +
+  geom_boxplot(alpha=.5, width=0.25)+
+  geom_violin(alpha=0.5, width=1)+
+    geom_jitter( width=.2, height=0)+
+  scale_fill_manual(values=four_colors)+
+  scale_color_manual(values=four_colors)+
+  labs(
+    title=str_wrap("Stomatal Conductance Across Inoculation Treatments in Tomato", 40)
+  ) +
+  ylab("Stomatal Conductance (mol m-2 s-1)")+
+  theme_minimal()+
+  theme(
+    legend.position="none",
+    text = element_text(size=24, family="mont"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+# Density figure for stomatal conductance
+
+ggplot(data=Li_data, aes(x=gsw, group=Treatment, color=Treatment, fill=Treatment))+
+  geom_density(adjust=1, alpha=.5)+
+  scale_fill_manual(values=four_colors)+
+    scale_color_manual(values=four_colors)+
+  ylab("Density")+
+  xlab("Stomatal Conductance (mol m-2 s-1)")+
+  theme_minimal()+
+  labs(
+    title=str_wrap("Stomatal Conductance Density for Inoculation Treatments in Tomato", 40)
+  )+
+  theme(
+    legend.position="right",
+    text = element_text(size=24, family="mont"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+## Individual density figures
+
+ggplot(data=Li_data, aes(x=gsw, group=Treatment, color=Treatment, fill=Treatment))+
+  geom_density(adjust=1.5, alpha=.5)+
+  scale_fill_manual(values=four_colors)+
+    scale_color_manual(values=four_colors)+
+  facet_wrap(~Treatment)+
+  xlab("Stomatal Conductance (mol m-2 s-1)")+
+    ylab("Density")+
+    labs(
+    title="Stomatal Conductance Density for Inoculation Treatments in Salt Stressed Tomato"
+  )+
+  theme_minimal()+
+  theme(
+    legend.position="none",
+    text = element_text(size=24, family="mont"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+## PhiPS2 Density Graph
+ggplot(data=Li_data, aes(x=PhiPS2, group=Treatment, color=Treatment, fill=Treatment))+
+  geom_density(adjust=1, alpha=.5)+
+    scale_color_manual(values=four_colors)+
+  scale_fill_manual(values=four_colors)+
+  ylab("Density")+
+  xlab("PhiPS2")+
+  theme_minimal()+
+  labs(
+    title="PhiPS2 Density for Inoculation Treatments in Tomato"
+  )+
+  theme(
+    legend.position="right",
+    text = element_text(size=24, family="mont"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+# check for correlation between PhiPS2 and Qamb
+
+ggplot(data = Li_data, aes(x=Qamb , y = PhiPS2, shape=Treatment, color=Treatment)) +
+  geom_point()+
+  scale_color_manual(values=four_colors)+
+  theme_minimal()+
+  ylab("PhiPS2")+
+  xlab("Ambient Light")+
+  labs(
+    title="Correlation between light and PhiPS2 in Tomato"
+  )+
+  theme(
+    legend.position = "right",
+    text = element_text(size=24, family="mont"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+# check for correl between gsw and rh_s
+
+ggplot(data = Li_data, aes(x= rh_s, y = gsw, shape=Treatment, color=Treatment)) +
+  geom_jitter(with=0.2)+
+  scale_color_manual(values=four_colors)+
+  theme_minimal()+
+  ylab("Stomatal Conductance (mol m-2 s-1)")+
+  xlab("Relative Humidity")+
+  labs(
+    title=str_wrap("Correlation Between Relative Humidity and Stomatal Conductance in Tomato", 40)
+  )+
+  theme(
+    text = element_text(size=24, family="mont"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+
+ggplot(data = Li_data, aes(x= rh_s, y = gsw, shape=Treatment, color=Treatment)) +
+  geom_point()+
+  #geom_smooth(method=lm, se=TRUE)+
+  scale_color_manual(values=four_colors)+
+  theme_minimal()+
+  facet_wrap(~Treatment)+
+  ylab("Stomatal Conductance (mol m-2 s-1)")+
+  xlab("Relative Humidity")+
+  labs(
+    title=str_wrap("Correlation Between Relative Humidity and Stomatal Conductance in Tomato", 40)
+  )+
+  theme(
+    legend.position="none",
+    text = element_text(size=24, family="mont"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+### vapor pressure deficit
+
+ggplot(data = Li_data, aes(x= rh_s, y = VPDleaf, shape=Treatment, color=Treatment)) +
+  geom_point()+
+  #geom_smooth(method=lm, se=TRUE)+
+  scale_color_manual(values=four_colors)+
+  theme_minimal()+
+  facet_wrap(~Treatment)+
+  ylab("VPD Leaf")+
+  xlab("Relative Humidity")+
+  labs(
+    title=str_wrap("Correlation Between Relative Humidity and Vapor Pressure Deficit in Tomato", 40)
+  )+
+  theme(
+    legend.position="none",
+    text = element_text(size=24, family="mont"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+  #annotate("text", x=3, y=0.4, label="*", size=6)+
+  #annotate("text", x=2, y=0.225, label="***", size=6)+
+  #annotate("text", x=4, y=.075, label="***", size=6)+
+
+
+# linear mixed model with stomatal conductance (gsw) as response, Treatment as predictor, relative humidity (rh_s) as fixed effect, and plant as random effect
+
+summary(gsw_lmm <- (lmer(
+  gsw ~ Treatment + rh_s + (1|Plant),
+  data = Li_data)))
+
+# linear mixed model with rh_s as predictor and no treatment
+summary(gsw_lmm_no_T <- (lmer(
+  gsw ~ rh_s + (1|Plant),
+  data = Li_data)))
+
+# linear mixed model with PhiPS2 as response, Treatment as predictor (explanatory), light (Qamb) as fixed effect, and plant as random effect
+
+summary(model_PhiPS2 <- (lmer(
+  PhiPS2 ~ Treatment + Qamb + (1|Plant),
+  data = Li_data)))
+
+
+summary(model_PhiPS2 <- (lmer(
+  PhiPS2 ~ Qamb + (1|Plant),
+  data = Li_data)))
+```
+
+### Stomatal Conductance Analysis
+
+use Q-Q plots and Shapiro-Wilk tests to check gsw and PhiPS2 for normality
+
+take previous graphs and model trendlines, ribbons, and dotted error outlines
+
+```{r gsw, include=TRUE}
+
+#check for normality
+ggplot(data=Li_data, aes(sample=gsw))+
+  stat_qq()+
+  stat_qq_line()
+
+hist(Li_data$gsw)
+
+shapiro.test(Li_data$gsw)
+#p value = 2.2e-16
+# not normal
+
+ggplot(data=Li_data, aes(sample=PhiPS2))+
+  stat_qq()+
+  stat_qq_line()
+#PhiPS2 is clearly visually not normal, at least at high x values
+
+shapiro.test(Li_data$PhiPS2)
+#p value 2.2e-16
+# not normal
+
+#Log transform mass and sugar_avg
+Li_data$rh_slog <- log(Li_data$rh_s)
+Li_data$gswlog <- log(Li_data$gsw)
+
+#make a linear model
+gr_mod <- lm(gswlog ~ rh_slog, data=Li_data)
+summary(gr_mod)
+# R squared of 0.3158
+
+ggplot(data = Li_data, aes(x= rh_s, y = gswlog)) +
+    geom_jitter(width=0.2, aes(shape=Treatment, color=Treatment))+
+    scale_color_manual(values=four_colors)+
+  theme_minimal()+
+  ylab(" Log of Stomatal Conductance (mol m-2 s-1)")+
+  xlab("Relative Humidity")+
+  labs(
+    title=str_wrap("Correlation Between Relative Humidity and Log of Stomatal Conductance in Tomato", 40)
+  )+
+  theme(
+    text = element_text(size=24, family="mont"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+#add trendline
+## need sequence of x values
+seq_rhslog <- seq(min(Li_data$rh_slog), max(Li_data$rh_slog), length=100)
+## put those x values in a data frame
+prh <- data.frame(rh_slog = seq_rhslog)
+## calculate predicted values
+pred2 <- predict(gr_mod, newdata=data.frame(prh),
+                 se.fit=TRUE)
+## we need to pull fit and se.fit from pred2 to create confidence interval
+# feed them to qlnorm()
+prh$lowest <- qlnorm(0.001, pred2$fit, pred2$se.fit)
+prh$upest <- qlnorm(0.999, pred2$fit, pred2$se.fit)
+prh$lo <- qlnorm(0.025, pred2$fit, pred2$se.fit)
+prh$up <- qlnorm(0.975, pred2$fit, pred2$se.fit)
+prh$md <- qlnorm(0.5, pred2$fit, pred2$se.fit)
+
+
+ggplot(data = Li_data, aes(x= rh_s, y = gsw)) +
+    geom_jitter(width=0.2, aes(shape=Treatment, color=Treatment))+
+    geom_ribbon(data=prh, aes( x=exp(seq_rhslog), y=md,
+                               ymin=lowest, ymax=upest), alpha=0.1)+
+  geom_ribbon(data=prh, aes( x=exp(seq_rhslog), y=md, ymin=lo, ymax=up), alpha=0.3)+
+  geom_line(data=prh, aes( x=exp(seq_rhslog), y=md))+
+  scale_color_manual(values=four_colors)+
+  theme_minimal()+
+  ylab("Stomatal Conductance (mol m-2 s-1)")+
+  xlab("Relative Humidity")+
+  labs(
+    title="Correlation Between Relative Humidity and Stomatal Conductance in Tomato"
+  )+
+  theme(
+    text = element_text(size=24, family="mont"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold")
+  )
+
+```
+
+
+## Fruit Lab Analysis
+
+```{r FL_analysis, include=TRUE}
+
+#check for normality
+shapiro.test(FL_data_no_BER$mass)
+# not normal
+
+shapiro.test(FL_data_no_BER$sugar_avg)
+# normal!
+
+leveneTest(FL_data_no_BER$sugar_avg~FL_data_no_BER$Treatment)
+#homoscedastic!
+
+FLout <- identify_outliers(data=FL_data_no_BER, sugar_avg)
+
+## Linear mixed models
+
+summary(model_mass <- (lmer(
+  mass ~ Treatment + (1| plant_fac),
+  data = FL_data)))
+
+summary(model_mass_no_BER <- (lmer(
+  mass ~ Treatment + (1| plant_fac),
+  data = FL_data_no_BER)))
+
+# Linear mixed model of sugar as a function of treatment with plant as a random effect
+summary(model_sugar_no_BER <- (lmer(
+  sugar_avg ~ Treatment + (1| plant_fac),
+  data = FL_data_no_BER)))
+
+#TUKEY (more or less) on the LMER
+difflsmeans(model_sugar_no_BER)
+
+## Plots
+
+## Density plots for sugar across no BER tomatoes
+ggplot(data=FL_data_no_BER, aes(x=sugar_avg, group=Treatment,color=Treatment, fill=Treatment))+
+  geom_density(adjust=1, alpha=.6)+
+  scale_fill_manual(values=four_colors)+
+  scale_color_manual(values=four_colors)+
+  ylab("Density")+
+  xlab("Sugar Concentration (%)")+
+  theme_minimal()+
+  #facet_wrap(~Treatment)+
+  labs(
+    title=str_wrap("Sugar Concentration Density for Inoculation Treatments in Tomato", 40)
+  )+
+  theme(
+    legend.position="right",
+    text = element_text(size=24, family="mont"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+## Density plots for sugar by plant across no BER tomatoes
+ggplot(data=FL_data_no_BER, aes(x=sugar_avg, group=Treatment,color=Treatment, fill=Treatment))+
+  geom_density(adjust=1, alpha=.6)+
+  scale_fill_manual(values=four_colors)+
+  scale_color_manual(values=four_colors)+
+  ylab("Density")+
+  xlab("Sugar Concentration (%)")+
+  theme_minimal()+
+  facet_wrap(~plant_fac)+
+  labs(
+    title=str_wrap("Sugar Concentration Density across each Plant in Inoculation Treatments in Tomato", 40)
+  )+
+  theme(
+    legend.position="right",
+    text = element_text(size=24, family="mont"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+## Density plots for mass across no BER tomatoes
+ggplot(data=FL_data_no_BER, aes(x=mass, group=Treatment,color=Treatment, fill=Treatment))+
+  geom_density(alpha=.6)+
+  scale_fill_manual(values=four_colors)+
+  scale_color_manual(values=four_colors)+
+  ylab("Density")+
+  xlab("Mass (g)")+
+  theme_minimal()+
+  #facet_wrap(~Treatment)+
+  labs(
+    title="Mass Density for Inoculation Treatments in Tomato"
+  )+
+  theme(
+    legend.position="right",
+    text = element_text(size=24, family="mont"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+## Density plots for mass by plant across no BER tomatoes
+ggplot(data=FL_data_no_BER, aes(x=mass, group=Treatment,color=Treatment, fill=Treatment))+
+  geom_density(alpha=.6)+
+  scale_fill_manual(values=four_colors)+
+  scale_color_manual(values=four_colors)+
+  ylab("Density")+
+  xlab("Mass (g)")+
+  theme_minimal()+
+  facet_wrap(~plant_fac)+
+  labs(
+    title="Mass Density for Inoculation Treatments in Tomato"
+  )+
+  theme(
+    legend.position="right",
+    text = element_text(size=24, family="mont"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+ggplot(data=FL_data, aes(x=Treatment, y=mass, color=Treatment, fill=Treatment))+
+  geom_violin(alpha=0.5)+
+  geom_boxplot(width=0.2, alpha=0.5)+
+  geom_jitter(width=0.1)+
+    scale_fill_manual(values=four_colors)+
+    scale_color_manual(values=four_colors)+
+  ylab("Tomato Mass (g)")+
+  xlab("Treatment")+
+  theme_minimal()+
+  ## facet_wrap(~Treatment)+
+  labs(
+    title="Tomato Mass by Microbial Inoculation Timing (w/BER)"
+  )+
+  theme(
+    legend.position="none",
+    text = element_text(size=24, family="mont", face="bold"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+ggplot(data=FL_data_no_BER, aes(x=Treatment, y=mass, color=Treatment, fill=Treatment))+
+  geom_violin(alpha=0.5)+
+  geom_boxplot(width=0.2, alpha=0.5)+
+  geom_jitter(width=0.1)+
+    scale_fill_manual(values=four_colors)+
+    scale_color_manual(values=four_colors)+
+  ylab("Tomato Mass (g)")+
+  xlab("Treatment")+
+  theme_minimal()+
+  #facet_wrap(~Treatment)+
+  labs(
+    title="Tomato Mass by Microbial Inoculation Timing"
+  )+
+  theme(
+    legend.position="none",
+    text = element_text(size=24, family="mont", face="bold"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+ggplot(data=FL_data_no_BER, aes(x=mass, y=sugar_avg, shape=Treatment, color=Treatment))+
+    geom_point()+
+    scale_color_manual(values=four_colors)+
+  ylab("Sugar Concentration (%)")+
+  xlab("Tomato Mass (g)")+
+  theme_minimal()+
+  facet_wrap(~Treatment)+
+  labs(
+    title="Tomato Sugar Concentration by Mass"
+  )+
+  theme(
+    legend.position="right",
+    text = element_text(size=24, family="mont", face="bold"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+ggplot(data=FL_data_no_BER, aes(x=mass, y=sugar_avg, shape=Treatment, color=Treatment))+
+    geom_point()+
+    scale_color_manual(values=four_colors)+
+  ylab("Sugar Concentration (%)")+
+  xlab("Tomato Mass (g)")+
+  theme_minimal()+
+  #facet_wrap(~Treatment)+
+  labs(
+    title="Tomato Sugar Concentration by Mass"
+  )+
+  theme(
+    legend.position="right",
+    text = element_text(size=24, family="mont", face="bold"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+ggplot(data=FL_data_no_BER, aes(x=d_diff, y=ripeness, shape=Treatment, color=Treatment))+
+    geom_jitter()+
+    scale_color_manual(values=four_colors)+
+  ylab("Ripeness")+
+  xlab("Days from Harvest to Analysis")+
+  theme_minimal()+
+  #facet_wrap(~Treatment)+
+  labs(
+    title="Tomato Ripeness by Days from Harvest to Analysis"
+  )+
+  theme(
+    legend.position="right",
+    text = element_text(size=24, family="mont", face="bold"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+ggplot(data=FL_data_no_BER, aes(x=d_diff, y=sugar_avg, shape=Treatment, color=Treatment))+
+    geom_jitter()+
+    scale_color_manual(values=four_colors)+
+  ylab("Sugar Concentration (%)")+
+  xlab("Days from Harvest to Analysis")+
+  theme_minimal()+
+  #facet_wrap(~Treatment)+
+  labs(
+    title="Tomato Sugar Concentration by Days from Harvest to Analysis"
+  )+
+  theme(
+    legend.position="right",
+    text = element_text(size=24, family="mont", face="bold"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+ggplot(data=FL_data_no_BER, aes(x=ripeness, y=sugar_avg, shape=Treatment, color=Treatment))+
+  geom_jitter(width=0.1)+
+  scale_color_manual(values=four_colors)+
+  ylab("Sugar Concentration (%)")+
+  xlab("Tomato Ripeness ")+
+  theme_minimal()+
+  facet_wrap(~Treatment)+
+  labs(
+    title="Tomato Sugar Concentration by Ripeness"
+  )+
+  theme(
+    legend.position="right",
+    text = element_text(size=24, family="mont", face="bold"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+ggplot(data=FL_data_no_BER, aes(x=Treatment, y=sugar_avg, color=Treatment, fill=Treatment))+
+  geom_violin(alpha=0.5)+
+  geom_boxplot(width=0.2, alpha=0.5)+
+  geom_jitter(width=0.1)+
+  scale_fill_manual(values=four_colors)+
+  scale_color_manual(values=four_colors)+
+  ylab("Sugar Concentration (%)")+
+  xlab("Treatment")+
+  theme_minimal()+
+  #facet_wrap(~Treatment)+
+  labs(
+    title=str_wrap("Tomato Sugar Concentration by Microbial Inoculation Timing", 40)
+  )+
+  theme(
+    legend.position="none",
+    text = element_text(size=24, family="mont", face="bold"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+ggplot(data=FL_data_no_BER, aes(x=Treatment, y=sugar_avg, color=mass))+
+  geom_jitter(width=0.2, size=2, alpha=0.8)+
+  scale_color_scico(begin=1, end=0, palette=a_palette)+
+  ylab("Sugar Concentration (%)")+
+  xlab("Treatment")+
+  theme_minimal()+
+  #facet_wrap(~Treatment)+
+  labs(
+    title="Tomato Sugar Concentration by Microbial Inoculation Timing"
+  )+
+  theme(
+    legend.position="right",
+    text = element_text(size=24, family="mont", face="bold"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+ggplot(data=FL_data_no_BER, aes(x=ripeness, y=sugar_avg, color=mass))+
+  geom_jitter(width=0.1, alpha=0.8, size=2)+
+  scale_color_scico(begin=1, end=0, palette=a_palette)+
+  ylab("Sugar Concentration (%)")+
+  xlab("Tomato Ripeness ")+
+  theme_minimal()+
+  facet_wrap(~Treatment)+
+  labs(
+    title="Tomato Sugar Concentration by Ripeness"
+  )+
+  theme(
+    legend.position="right",
+    text = element_text(size=24, family="mont", face="bold"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+```
