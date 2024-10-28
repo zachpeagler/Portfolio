@@ -38,7 +38,11 @@ GRAPHING
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-require(tidyverse); require(lme4); require(showtext); require(scico); require(pwr); require(car); require(ggpubr); require(rstatix); require(ggridges); require(MASS)
+require(tidyverse); require(lme4); require(showtext); require(scico); require(pwr); require(car); require(ggpubr); require(rstatix); require(ggridges); require(MASS); require(devtools)
+
+## secondary packages (requires devtools)
+install_github("zachpeagler/multifit")
+require(multifit)
 
 ```
 
@@ -71,8 +75,9 @@ four_shapes = c(15,16,17,23)
 
 # 2. Load Data
 
-## 2.1 Li-600 Data
+## 2.1 Photosynthesis data
 
+## 2.1.1 Li-600 data
 Load Li-600 data from file and convert strings to factors. Then change the treatments from numbers to the names of the groups. From here, filter the data for only those readings that have a leak percent of less than 10. QUESTION: What leak percent is acceptable to filter out? Rename the Date column to Date_ref to use it as a check that we formatted dates correctly. Format date to POSIXct in month-day-year format. Create a new plant factor that corresponds to each unique plant, then re-level the Treatment for consistency across analyses. Then we make a new column that is the log of gsw.
 
 From here, outliers in the main target variables (stomatal conductance [gsw] and photosystem II efficiency [PhiPS2]) were identified. QUESTION: should I remove statistical outliers even if I assume the collection methods were not flawed.
@@ -86,7 +91,7 @@ As a final note, this data has something wrong with it, as there are ~100 gsw va
 ```{r Li_data, include=TRUE, echo=TRUE}
 
 ## Load and clean Li-600 data
-Li_data_file <- "C:/Github/Portfolio/R Shiny Apps/01 Tomato Inoculants 2024/TIP24_LI600.csv"
+Li_data_file <- "C:/Github/Portfolio/_data/tomato_inoculants/TIP24/TIP24_LI600.csv"
 Li_data <- read.csv(Li_data_file, stringsAsFactors = T) %>%
   mutate(Treatment = case_when(
           Row==1~"Control",
@@ -140,6 +145,26 @@ Li_data_stats_byplant <- Li_data %>%
 print(Li_data_stats)
 #print(Li_data_stats_byplant)
 
+```
+
+## 2.1.2 MultispeQ data
+```{r mq_data}
+mq_file <- "C:/Github/Portfolio/_data/tomato_inoculants/TIP24/TIP24_Multispeq.csv"
+m_data <- read.csv(mq_file) %>%
+  mutate(Treatment = case_when(
+    Row=="A"~"Control",
+    Row=="B"~"Transplantation",
+    Row=="C"~"Germination",
+    Row=="D"~"Germ+Trans",
+    TRUE~NA),
+    Row_num = case_when(
+    Row=="A"~ 1,
+    Row=="B"~ 2,
+    Row=="C"~ 3,
+    Row=="D"~ 4,
+    TRUE~NA),
+     plant_fac = as.factor(paste(Row_num, Pot))
+    )
 ```
 
 ## 2.2 Fruit Data
@@ -279,12 +304,9 @@ print(Fl_data_mb)
 
 # 3. Analyses
 
-## 3.1 Li-600 Analysis
+## 3.1 Photosynthesis Analysis
 
 ### 3.1.1 Exploratory Li-600 Analysis
-
-Check for interactions and get a feel for the data. Use Q-Q plots and Shapiro-Wilk tests to check gsw and PhiPS2 for normality. 
-
 
 QUESTION: How do I change the xlim when x is a non-numeric factor.
 
@@ -466,7 +488,7 @@ ks.test(Li_data$PhiPS2, "plnorm",meanlog=PhiPS2_ln$estimate[1],
 ks.test(Li_data$PhiPS2, "pnorm",mean=PhiPS2_n$estimate[1],
                    sd=PhiPS2_n$estimate[2])
 
-# check for heterodescasticity
+# check for heteroscedasticity
 leveneTest(Li_data$gsw~Li_data$Treatment)
 leveneTest(Li_data$PhiPS2~Li_data$Treatment)
 
@@ -606,8 +628,70 @@ ggplot(data = Li_data, aes(x=Qamb, y = PhiPS2, color = Tleaf)) +
 
 ```
 
+### 3.1.2 Exploratory MultispeQ Analysis
+```{r m_exploratory}
 
-### 3.1.2 Stomatal Conductance Analysis
+multiPDF_plot(m_data$Phi2, 100, c('normal','lognormal','gamma'))
+multiCDF_plot(m_data$Phi2, 100, c('normal','lognormal','gamma'))
+mPhi2_ks <- multiKS_cont(m_data$Phi2, c('normal','lognormal','gamma'))
+
+multiPDF_plot(m_data$FvP_over_FmP, 100, c('normal','lognormal','gamma', 'cauchy', 'weibull'))
+multiCDF_plot(m_data$FvP_over_FmP, 100, c('normal','lognormal','gamma', 'cauchy', 'weibull'))
+FvPFmP_ks <- multiKS_cont(m_data$FvP_over_FmP, c('normal','lognormal','gamma', 'cauchy', 'weibull'))
+
+# check for heteroscedasticity
+leveneTest(m_data$Phi2~m_data$Treatment)
+leveneTest(log(m_data$Phi2)~m_data$Treatment)
+leveneTest(m_data$FvP_over_FmP~m_data$Treatment)
+
+## PhiPS2 Density Graph by plant
+ggplot(data=m_data, aes(x=Phi2, y = plant_fac, color=Treatment, fill=Treatment))+
+  geom_density_ridges()+
+  scale_fill_manual(values=four_colors)+
+    scale_color_manual(values=four_colors)+
+  ylab("Density")+
+  xlab("Stomatal Conductance (mol m-2 s-1)")+
+  theme_minimal()+
+  labs(
+    title=str_wrap("Photosystem II Efficiency Density for Different Tomato Plants by Treatment", 40)
+  )+
+  theme(
+    legend.position="right",
+    text = element_text(size=24, family="mont", lineheight = 0.5),
+    axis.title.y = element_text(size=0),
+    axis.text.x = element_text(size=24, family="mont"),
+    axis.text = element_text(size=12, family="mont"),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+ggplot(data = m_data, aes(x=Light.Intensity..PAR., y = Phi2, 
+                           shape=Treatment, fill=Treatment, color = Treatment)) +
+  geom_jitter(width=1, size=2, alpha=1)+
+  scale_color_manual(values=four_colors)+
+  scale_shape_manual(values=four_shapes)+
+  scale_fill_manual(values=four_colors)+
+  theme_minimal()+
+  ylab("PhiPS2")+
+  xlab("Ambient Light")+
+  labs(
+    title=str_wrap("Photosystem II Efficiency By Ambient Light Across
+                   Inoculation Treatment in Tomato", 50)
+  )+
+  theme(
+    text = element_text(size=24, family="mont"),
+    legend.title = element_text(size=24, family="mont", face="bold"),
+    legend.text = element_text(size=20, family="mont"),
+    legend.key.height = unit(.3, "cm"),
+    legend.background = element_rect(color=four_colors[3], fill=NA, 
+                                     linewidth=.5, linetype = 2),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold", lineheight = .5)
+  )
+
+```
+
+### 3.1.3 Stomatal Conductance Analysis
 
 
 Do a generalized linear mixed model with stomatal conductance (gsw) as response, Treatment as predictor, relative humidity (rh_s) as fixed effect, and plant as random effect, with an inverse link function because gsw has a gamma distribution.
@@ -658,7 +742,8 @@ ggplot(data = Li_data, aes(x=rh_s, y = log(gsw),
   ylab("Log of Stomatal Conductance (mol m-2 s-1)")+
   xlab("Relative Humidity")+
   labs(
-    title=str_wrap("Log Adjusted Stomatal Conductance By Relative Humidity Across Inoculation Treatment in Tomato", 50)
+    title=str_wrap("Log Adjusted Stomatal Conductance By Relative
+                   Humidity Across Inoculation Treatment in Tomato", 50)
   )+
   theme(
     text = element_text(size=24, family="mont"),
@@ -707,7 +792,8 @@ ggplot(data = Li_data_no_outliers, aes(x= Treatment, y = gsw, fill=Treatment, co
   scale_fill_manual(values=four_colors)+
   scale_color_manual(values=four_colors)+
   labs(
-    title=str_wrap("Stomatal Conductance Across Inoculation Treatments in Tomato No Outliers", 40)
+    title=str_wrap("Stomatal Conductance Across Inoculation
+                   Treatments in Tomato No Outliers", 40)
   ) +
   ylab("Stomatal Conductance (mol m-2 s-1)")+
   theme_minimal()+
@@ -728,7 +814,8 @@ ggplot(data = Li_data_stats_byplant, aes(x= Treatment, y = gsw_mean, fill=Treatm
   scale_fill_manual(values=four_colors)+
   scale_color_manual(values=four_colors)+
   labs(
-    title=str_wrap("Mean Stomatal Conductance Per Plant Across Inoculation Treatments in Tomato", 50)
+    title=str_wrap("Mean Stomatal Conductance Per Plant
+                   Across Inoculation Treatments in Tomato", 50)
   ) +
   ylab("Stomatal Conductance (mol m-2 s-1)")+
   theme_minimal()+
@@ -743,7 +830,7 @@ ggplot(data = Li_data_stats_byplant, aes(x= Treatment, y = gsw_mean, fill=Treatm
 
 
 
-### 3.1.3 PhiPS2 Analysis
+### 3.1.4 PhiPS2 Analysis
 
 ```{r PhiPS2_analysis, include=TRUE, echo=TRUE}
 
@@ -802,7 +889,8 @@ ggplot(data = Li_data, aes(x=Date, y = PhiPS2, color = Tleaf)) +
     legend.title.position = "top",
     legend.position.inside=c(0.75,0.2),
     legend.key.height = unit(.3, "cm"),
-   legend.background = element_rect(color=two_colors[2], fill=NA, linewidth=.5, linetype = 2),
+   legend.background = element_rect(color=two_colors[2], 
+                                    fill=NA, linewidth=.5, linetype = 2),
     axis.title = element_text(size=24, family = "mont", face= "bold"),
     title = element_text(size=30, family="open", face="bold", lineheight = .5)
   )
@@ -814,12 +902,17 @@ ggplot(data = Li_data, aes(x= Treatment, y = PhiPS2, fill=Treatment, color=Treat
   geom_boxplot(alpha=.5, width=0.25)+
   geom_violin(alpha=0.5, width=1)+
     geom_jitter( width=.2, height=0)+
-    stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans")), size=8, family="mont")+
+    stat_compare_means(comparisons = list(
+      c("Control","Germination"),
+      c("Control", "Transplantation"),
+      c("Control", "Germ+Trans")),
+      size=8, family="mont")+
   stat_compare_means(label.x=3.5, label.y=1.05, size=8,family="mont")+
   scale_fill_manual(values=four_colors)+
   scale_color_manual(values=four_colors)+
   labs(
-    title=str_wrap("Efficiency of Photosystem II Across Inoculation Treatments in Tomato", 40)
+    title=str_wrap("Efficiency of Photosystem II Across
+                   Inoculation Treatments in Tomato", 40)
   ) +
   ylab("PhiPS2")+
   theme_minimal()+
@@ -840,7 +933,8 @@ ggplot(data = Li_data_no_outliers, aes(x= Treatment, y = PhiPS2, fill=Treatment,
   scale_fill_manual(values=four_colors)+
   scale_color_manual(values=four_colors)+
   labs(
-    title=str_wrap("Efficiency of Photosystem II Across Inoculation Treatments in Tomato No Outliers", 40)
+    title=str_wrap("Efficiency of Photosystem II Across
+                   Inoculation Treatments in Tomato No Outliers", 40)
   ) +
   ylab("PhiPS2")+
   theme_minimal()+
@@ -856,12 +950,20 @@ ggplot(data = Li_data_stats_byplant, aes(x= Treatment, y = PhiPS2_mean, fill=Tre
   geom_boxplot(alpha=.5, width=0.1)+
   geom_violin(alpha=0.5, width=1)+
     geom_jitter( width=.2, height=0)+
-    stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Germination", "Transplantation"), c("Germination", "Germ+Trans"), c("Transplantation", "Germ+Trans")), size=8, family="mont")+
+    stat_compare_means(comparisons = list(
+      c("Control","Germination"),
+      c("Control", "Transplantation"),
+      c("Control", "Germ+Trans"),
+      c("Germination", "Transplantation"),
+      c("Germination", "Germ+Trans"),
+      c("Transplantation", "Germ+Trans")),
+      size=8, family="mont")+
   stat_compare_means(label.x=.5, label.y=.8, size=8,family="mont")+
   scale_fill_manual(values=four_colors)+
   scale_color_manual(values=four_colors)+
   labs(
-    title=str_wrap("Mean Photosystem II Efficiency Per Plant Across Inoculation Treatments in Tomato", 50)
+    title=str_wrap("Mean Photosystem II Efficiency Per Plant
+                   Across Inoculation Treatments in Tomato", 50)
   ) +
   ylab("PhiPS2")+
   theme_minimal()+
