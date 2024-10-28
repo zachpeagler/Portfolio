@@ -41,8 +41,8 @@ knitr::opts_chunk$set(echo = TRUE)
 require(tidyverse); require(lme4); require(showtext); require(scico); require(pwr); require(car); require(ggpubr); require(rstatix); require(ggridges); require(MASS); require(devtools)
 
 ## secondary packages (requires devtools)
-install_github("zachpeagler/multifit")
-require(multifit)
+install_github("zachpeagler/multiFitR")
+require(multiFitR)
 
 ```
 
