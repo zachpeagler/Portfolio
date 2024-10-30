@@ -22,23 +22,53 @@ An R Shiny app created as part of my Master's thesis at Kennesaw State Universit
 
 This uses R, the packages tidyverse, shiny, showtext, scico, bslib, MASS, ggpubr, and GWalkR.
 
-## Hypotheses
+## Variables
 
-## Predictions
+### 1. Li-600
 
-# Methods
+#### Explanatory variables
+ - Treatment
+ - relative humidity
+ - ambient light
 
-## Biological
+#### Response Variables
+ - gsw - stomatal conductance
+    - distribution most similar to gamma, lognormal
+    - not homoscedastic by Levene and Bartlett tests
+    - continuous [0.0:3.0]
+ - PhiPS2 - quantum yield in light
+    - significantly different from all cont distributions
+        - most similar to gamma, lognormal
+    - not homoscedastic by Levene and Bartlett tests
+    - continuous [0.5:1.0]
 
-## Statistical
+### 2. Multispeq
 
-### Statistical tests reasoning
+#### Explanatory variables
+- Treatment
+- relative humidity
+- ambient light
 
-### Visualization reasoning
+#### Response Variables
+ - FvP/FmP - efficiency of open reaction centers in light
+    - significantly different from all cont distributions
+      - most similar to normal, lognormal, and gamma
+    - homoscedastic by Levene and Bartlett tests
+    - continuous, [0.7:0.8]
+ - PhiPS2 - quantum yield in light
+    - not significantly different from normal, lognormal, or gamma distribution
+    - not homoscedastic by Levene and Bartlett tests
+    - continuous [0.45:0.70]
 
-# Results
+### 3. Fruit
 
-# Discussion
+#### Explanatory variables
+ - Ripeness
+ - Treatment
+
+#### Response Variables
+ - Mass
+ - Sugar concentration
 
 # Acknowledgements
 

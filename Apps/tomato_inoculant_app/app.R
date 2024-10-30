@@ -96,7 +96,7 @@ m_data <- m_data[,c("Row", "Pot", "plant_fac", "Treatment", "Device.ID",
                     "Ambient.Humidity")]
 # set multispeq variables that will be used in scatter plot
 m_vars <- c("plant_fac", "Row", "Pot", "Treatment", "Device.ID", "Date",
-            "Time.of.Day", "Leaf.Damage.", "Pests.Present.",
+            "Time.of.Day", "Leaf.Damage.", "Pests.Present.", "Light.Intensity..PAR.",
             "Leaf.Temperature", "FvP_over_FmP", "Phi2", "Ambient.Temperature", 
             "Ambient.Humidity")
 Qp2 <- quantile(m_data$Phi2, probs=c(.25, .75), na.rm=FALSE)
@@ -127,7 +127,9 @@ Fl_data <- read.csv(Fl_data_file, stringsAsFactors = T) %>%
     ripeness = abs(1-(penetrometer/max(na.omit(penetrometer))))
   )
 ## make fruit variables
-fruit_vars <- c("Treatment", "plant_fac", "BER", "fungus", "cracking", "date_analysis", "d_diff",
+fruit_vars <- c("Treatment", "plant_fac",
+                "BER", "fungus", "cracking",
+                "date_analysis", "d_diff",
                 "mass", "sugar_avg", "ripeness")
 ## Get mass and sugar quantiles and IQR
 Qmass <- quantile(na.omit(Fl_data$mass), probs=c(.25, .75), na.rm=FALSE)
@@ -169,7 +171,7 @@ ui <- navbarPage(title = "Tomato Inoculants",
         card(card_header("Li-600", class = "bg-primary"),
         card(card_header("Stomatal Conductance (gsw)",
                          class = "bg-secondary"),
-             card(layout_sidebar(sidebar = sidebar(
+             card(layout_sidebar(sidebar = sidebar(open = FALSE,
                checkboxGroupInput("gsw_dists", "Distributions",
                                   choices = dists, selected = c("normal", "lognormal", "gamma"))
              ),
@@ -197,7 +199,7 @@ ui <- navbarPage(title = "Tomato Inoculants",
             ),
        card(card_header("Efficiency of Photosystem II (PhiPS2)",
                         class = "bg-secondary"),
-            card(layout_sidebar(sidebar = sidebar(
+            card(layout_sidebar(sidebar = sidebar(open = FALSE,
               checkboxGroupInput("phi_dists", "Distributions",
                                  choices = dists, selected = c("normal", "lognormal", "gamma"))
             ),
@@ -226,7 +228,7 @@ ui <- navbarPage(title = "Tomato Inoculants",
        card(card_header("MultispeQ", class = "bg-primary"),
             card(card_header("FvP over FmP",
                              class = "bg-secondary"),
-                 card(layout_sidebar(sidebar = sidebar(
+                 card(layout_sidebar(sidebar = sidebar(open = FALSE,
                    checkboxGroupInput("fvp_dists", "Distributions",
                                       choices = dists, selected = c("normal", "lognormal", "gamma"))
                  ),
@@ -254,7 +256,7 @@ ui <- navbarPage(title = "Tomato Inoculants",
             ),
             card(card_header("Efficiency of Photosystem II (PhiPS2)",
                              class = "bg-secondary"),
-                 card(layout_sidebar(sidebar = sidebar(
+                 card(layout_sidebar(sidebar = sidebar(open = FALSE,
                    checkboxGroupInput("p2_dists", "Distributions",
                                       choices = dists, selected = c("normal", "lognormal", "gamma"))
                  ),
@@ -391,8 +393,54 @@ ui <- navbarPage(title = "Tomato Inoculants",
           )
        ),
        card(card_header("MultispeQ", class = "bg-primary"),
-       )
-            
+            card(card_header("Open Reaction Center Efficiency in Light (FvP/FmP)", class = "bg-secondary"),
+                 card_body("Based on the exploratory analysis, FvP/FmP is heteroscedastic and 
+                           while significantly different from all continuous distributions, is most
+                           similar to the normal, lognormal, and gamma distributions. I'm going to test it 
+                           against the gamma and lognormal."),
+        card_body(layout_column_wrap(
+          card(card_header("GLM with Gamma family and log link"),
+               card_body(verbatimTextOutput("fvp_glm_gamma"), max_height= 500),
+               card_body(layout_column_wrap(
+                 card(card_header("Pseudo-R2"),
+                      card_body(verbatimTextOutput("fvp_glm_gamma_r2"))),
+                 value_box(title = "AIC", value = textOutput("fvp_glm_gamma_AIC"))
+               ))
+          ),
+          card(card_header("GLM with gaussian family and log link"),
+               card_body(verbatimTextOutput("fvp_glm_log"), max_height= 500),
+               card_body(layout_column_wrap(
+                 card(card_header("Pseudo-R2"),
+                      card_body(verbatimTextOutput("fvp_glm_log_r2"))),
+                 value_box(title = "AIC", value = textOutput("fvp_glm_log_AIC"))
+               ))
+          )
+        ))), # end fvp card
+        card(card_header("Photosystem II Efficiency (PhiPS2)", class = "bg-secondary"),
+             card_body("Based on the exploratory analysis, PhiPS2 from the Multispeq is not significantly 
+                       different from the normal, lognormal, or gamma distributions. It is also heteroscedastic 
+                       as determined by Levene and Bartlett tests. Based on this, PhiPS2 will be analyzed in a GLMER with
+                       a lognormal or gamma distribution, using the same model parameters as the previous PhiPS2 model."),
+             card_body(layout_column_wrap(
+               card(card_header("GLM with Gamma family and log link"),
+                    card_body(verbatimTextOutput("p2_glm_gamma"), max_height= 500),
+                    card_body(layout_column_wrap(
+                      card(card_header("Pseudo-R2"),
+                           card_body(verbatimTextOutput("p2_glm_gamma_r2"))),
+                      value_box(title = "AIC", value = textOutput("p2_glm_gamma_AIC"))
+                    ))
+               ),
+               card(card_header("GLM with gaussian family and log link"),
+                    card_body(verbatimTextOutput("p2_glm_log"), max_height= 500),
+                    card_body(layout_column_wrap(
+                      card(card_header("Pseudo-R2"),
+                           card_body(verbatimTextOutput("p2_glm_log_r2"))),
+                      value_box(title = "AIC", value = textOutput("p2_glm_log_AIC"))
+                    ))
+               )
+             ))
+        ) # end P2 card
+       ) # end multispeq section
        ), # end statistical tests panel
        tabPanel("Data",
                 card(card_header("Li-600 Data", class = "bg-primary"),
@@ -405,7 +453,6 @@ ui <- navbarPage(title = "Tomato Inoculants",
                               and two PhotosynQ MultispeQ V2.0s over the course of the trial.
                               Data is presented in a tidy format with each row representing a single
                               observation and each column representing a variable. <br>
-                              
        ### **Li-600**
        #### Explanatory Variables
           **Treatment** is the inoculation timing of the tomato. Options are Control, Germination, Transplantation, and Germ+Trans. <br>
@@ -438,21 +485,59 @@ ui <- navbarPage(title = "Tomato Inoculants",
   nav_panel("Fruit",
     tabsetPanel(
       tabPanel("Distributions",
-        card(card_header("Sugar"),
+        card(card_header("Sugar", class = "bg-primary"),
+             card(layout_sidebar(sidebar = sidebar(open = FALSE,
+               checkboxGroupInput("sug_dists", "Distributions",
+                choices = dists, selected = c("normal", "lognormal", "gamma"))
+            ),
           card_body(layout_column_wrap(
             card(card_header("Probability Density Function Plot"),
               card_body(plotOutput("sug_pdf"))),
             card(card_header("Cumulative Distribution Function Plot"),
               card_body(plotOutput("sug_cdf")))
-              ))),
-        card(card_header("Mass"),
+            ))
+            )),
+          card(layout_column_wrap(
+            card(card_header("One-sample Kolmogorov-Smirnov Tests"),
+                 verbatimTextOutput("sug_mKS")
+            ),
+            card(card_header("Tests for Homogeneity of Variances"),
+                 card(card_header("Levene Test"),
+                      verbatimTextOutput("sug_levene")
+                 ),
+                 card(card_header("Bartlett Test"),
+                      verbatimTextOutput("sug_bartlett")
+                 )
+            )
+          ))
+          ),
+        card(card_header("Mass", class = "bg-primary"),
+             card(layout_sidebar(sidebar = sidebar(open = FALSE,
+                 checkboxGroupInput("mass_dists", "Distributions",
+                  choices = dists, selected = c("normal", "lognormal", "gamma"))
+                 ),
           card_body(layout_column_wrap(
             card(card_header("Probability Density Function Plot"),
               card_body(plotOutput("mass_pdf"))),
             card(card_header("Cumulative Distribution Function Plot"),
               card_body(plotOutput("mass_cdf")))
-          )))
-      ), # end distributions tab
+          ))
+        )),
+        card(layout_column_wrap(
+          card(card_header("One-sample Kolmogorov-Smirnov Tests"),
+               verbatimTextOutput("mass_mKS")
+          ),
+          card(card_header("Tests for Homogeneity of Variances"),
+               card(card_header("Levene Test"),
+                    verbatimTextOutput("mass_levene")
+               ),
+               card(card_header("Bartlett Test"),
+                    verbatimTextOutput("mass_bartlett")
+               )
+          )
+        ))
+      )
+    ), # end distributions tab
       tabPanel("Plots",
                card(card_header("Interactive Scatter Plot",
                                 class = "bg-primary"),
@@ -462,7 +547,7 @@ ui <- navbarPage(title = "Tomato Inoculants",
                       selectInput("fruit_y","Y Variable",
                                   choices = fruit_vars, selected = "mass"),
                       selectInput("fruit_col","Color Variable",
-                                  choices = fluoro_vars, selected = "sugar_avg"),
+                                  choices = fruit_vars, selected = "sugar_avg"),
                       sliderInput("fruit_jit", "Jitter Amount", min=0, max=10, value =3),
                       checkboxInput("fruit_fwrap", "Individual Plot Per Treatment", FALSE)
                     ),
@@ -470,6 +555,8 @@ ui <- navbarPage(title = "Tomato Inoculants",
                ),
                card(card_header("Boxplots", class = "bg-secondary"),
                     checkboxInput("fruit_box_stats", "Show Statistical Tests", FALSE),
+                    selectInput("fb_labels", "Show P symbols or P values",
+                                sigcodes, "Pvalues"),
                     card_body(layout_column_wrap(
                       card(card_header("Mass"),
                            card_body(plotOutput("mass_box"))),
@@ -482,7 +569,7 @@ ui <- navbarPage(title = "Tomato Inoculants",
                ) # end sidebar layout and card
       ),
       tabPanel("Statistical Tests",
-               card(card_header("Mass"),
+               card(card_header("Mass", class = "bg-secondary"),
                 card_body(markdown("Mass stat tests blurb yabadabadebop.")),
                 card_body(layout_column_wrap(
                  card(card_header("GLM with Gamma family and log link"),
@@ -500,17 +587,25 @@ ui <- navbarPage(title = "Tomato Inoculants",
                              card_body(verbatimTextOutput("mass_glm_log_r2"))),
                         value_box(title = "AIC", value = textOutput("mass_glm_log_AIC"))
                       ))
+                 ),
+                 card(card_header("Linear Model"),
+                      card_body(verbatimTextOutput("mass_glm_normal"), max_height= 500),
+                      card_body(layout_column_wrap(
+                        card(card_header("Pseudo-R2"),
+                             card_body(verbatimTextOutput("mass_glm_normal_r2"))),
+                        value_box(title = "AIC", value = textOutput("mass_glm_normal_AIC"))
+                      ))
                  )
                ))), # end mass
-               card(card_header("Sugar Concentration (%)"),
+               card(card_header("Sugar Concentration (%)", class = "bg-secondary"),
                     card_body("Based on the exploratory analysis, sugar is probably normal."),
                     card_body(layout_column_wrap(
                       card(card_header("GLM with Gamma family and log link"),
-                           card_body(verbatimTextOutput("sug_glm_normal"), max_height= 500),
+                           card_body(verbatimTextOutput("sug_glm_gamma"), max_height= 500),
                            card_body(layout_column_wrap(
                              card(card_header("Pseudo-R2"),
-                                  card_body(verbatimTextOutput("sug_glm_normal_r2"))),
-                             value_box(title = "AIC", value = textOutput("sug_glm_normal_AIC"))
+                                  card_body(verbatimTextOutput("sug_glm_gamma_r2"))),
+                             value_box(title = "AIC", value = textOutput("sug_glm_gamma_AIC"))
                            ))
                       ),
                       card(card_header("GLM with gaussian family and log link"),
@@ -520,11 +615,21 @@ ui <- navbarPage(title = "Tomato Inoculants",
                                   card_body(verbatimTextOutput("sug_glm_log_r2"))),
                              value_box(title = "AIC", value = textOutput("sug_glm_log_AIC"))
                            ))
+                      ),
+                      card(card_header("Linear Model"),
+                           card_body(verbatimTextOutput("sug_glm_normal"), max_height= 500),
+                           card_body(layout_column_wrap(
+                             card(card_header("Pseudo-R2"),
+                                  card_body(verbatimTextOutput("sug_glm_normal_r2"))),
+                             value_box(title = "AIC", value = textOutput("sug_glm_normal_AIC"))
+                           ))
                       )
                     ))) # end sugar
                ),
       tabPanel("Data",
-               DTOutput("fruit_data")
+               card(card_header("Fruit Data", class = "bg-primary"),
+                    DTOutput("fruit_data")
+                    )
       ),
       tabPanel("Info",
          card(
@@ -559,6 +664,9 @@ ui <- navbarPage(title = "Tomato Inoculants",
 
 ##### server #####
 server <- function(input, output) {
+# Reactive Values
+## (it would be better to use actual ReactiveValues objects, but it's far enough
+## along in the projec that I'm just going to keep doing it this way)
 ## Reactive expressions
   Rpalette <- reactive({input$palette})
   Rleak_pct <- reactive({input$leak_pct})
@@ -579,8 +687,17 @@ server <- function(input, output) {
   Rphi_dists <- reactive({input$phi_dists})
   Rp2_dists <- reactive({input$p2_dists})
   Rfvp_dists <- reactive({input$fvp_dists})
-
-  ### Reactive dataframes
+  Rmass_dists <- reactive({input$mass_dists})
+  Rsug_dists <- reactive({input$sug_dists})
+  Rfruit_x <- reactive({input$fruit_x})
+  Rfruit_y <- reactive({input$fruit_y})
+  Rfruit_col <- reactive({input$fruit_col})
+  Rfruit_jit <- reactive({input$fruit_jit * .1})
+  Rfruit_fwrap <- reactive({input$fruit_fwrap})
+  Rfruit_box_stats <- reactive({input$fruit_box_stats})
+  Rfb_labels <- reactive({input$fb_labels})
+  
+## Reactive dataframes
   RLi_data <- reactive({
     x <- Li_data
     if (input$outliers == TRUE) {
@@ -617,7 +734,8 @@ server <- function(input, output) {
     f <- subset(f, mass > input$min_mass)
     return(f)
   })
-### Reactive GLMs
+## Reactive GLMs
+### Li-600
 #### gsw
   Rgsw_glm_gamma <- reactive({
     glmer(gsw ~ Treatment + rh_s + (1 | plant_fac),
@@ -636,6 +754,53 @@ server <- function(input, output) {
     glmer(PhiPS2 ~ Treatment + Qamb + (1 | plant_fac),
           data = RLi_data(), family = gaussian(link = "log"))
   })
+### Multispeq
+#### FvP/FmP
+  Rfvp_glm_gamma <- reactive({
+    glmer(FvP_over_FmP ~ Treatment + Ambient.Humidity + (1 | plant_fac),
+          data = Rm_data(), family = Gamma(link = "log"))
+  })
+  Rfvp_glm_log <- reactive({
+    glmer(FvP_over_FmP ~ Treatment + Ambient.Humidity + (1 | plant_fac),
+          data = Rm_data(), family = gaussian(link = "log"))
+  })
+#### Phi2
+  Rp2_glm_gamma <- reactive({
+    glmer(Phi2 ~ Treatment + Light.Intensity..PAR. + (1 | plant_fac),
+          data = Rm_data(), family = Gamma(link = "log"))
+  })
+  Rp2_glm_log <- reactive({
+    glmer(Phi2 ~ Treatment + Light.Intensity..PAR. + (1 | plant_fac),
+          data = Rm_data(), family = gaussian(link = "log"))
+  })
+### Fruit
+#### Mass
+  Rmass_glm_gamma <- reactive({
+    glmer(mass ~ Treatment + (1 | plant_fac),
+          data = RFl_data(), family = Gamma(link = "log"))
+  })
+  Rmass_glm_log <- reactive({
+    glmer(mass ~ Treatment + (1 | plant_fac),
+          data = RFl_data(), family = gaussian(link = "log"))
+  })
+  Rmass_glm_normal <- reactive({
+    glmer(mass ~ Treatment + (1 | plant_fac),
+         data = RFl_data(), family = gaussian(link = "identity"))
+  })
+#### Mass
+  Rsug_glm_gamma <- reactive({
+    glmer(sugar_avg ~ Treatment + (1 | plant_fac),
+          data = RFl_data(), family = Gamma(link = "log"))
+  })
+  Rsug_glm_log <- reactive({
+    glmer(sugar_avg ~ Treatment + (1 | plant_fac),
+          data = RFl_data(), family = gaussian(link = "log"))
+  })
+  Rsug_glm_normal <- reactive({
+    glmer(sugar_avg ~ Treatment + (1 | plant_fac),
+         data = RFl_data(), family = gaussian(link = "identity"))
+  })
+
 ## Fluorescence
 ### Distributions
 #### GSW
@@ -717,6 +882,7 @@ server <- function(input, output) {
   output$fvp_bartlett <- renderPrint({
     bartlett.test(FvP_over_FmP~Treatment, data=Rm_data())
   })
+
 ## PhiPS2 PDF output
   output$phi_pdf <- renderPlot({
     x <- RLi_data()$PhiPS2
@@ -1003,24 +1169,37 @@ server <- function(input, output) {
     return(pbox)
   })
 # Stats
-## gsw statistical outputs
+## Li-600
+### gsw statistical outputs
   output$gsw_glm_gamma <- renderPrint({ summary(Rgsw_glm_gamma())})
   output$gsw_glm_gamma_r2 <- renderPrint({ r.squaredGLMM(Rgsw_glm_gamma())})
   output$gsw_glm_gamma_AIC <- renderText({ AIC(Rgsw_glm_gamma())})
   output$gsw_glm_log <- renderPrint({ summary(Rgsw_glm_log())})
   output$gsw_glm_log_r2 <- renderPrint({ r.squaredGLMM(Rgsw_glm_log())})
   output$gsw_glm_log_AIC <- renderText({ AIC(Rgsw_glm_log())})
-## PhiPS2 statistical outputs
+###PhiPS2 statistical outputs
   output$phi_glm_gamma <- renderPrint({ summary(Rphi_glm_gamma())})
   output$phi_glm_gamma_r2 <- renderPrint({ r.squaredGLMM(Rphi_glm_gamma())})
   output$phi_glm_gamma_AIC <- renderText({ AIC(Rphi_glm_gamma())})
   output$phi_glm_log <- renderPrint({ summary(Rphi_glm_log())})
   output$phi_glm_log_r2 <- renderPrint({ r.squaredGLMM(Rphi_glm_log())})
   output$phi_glm_log_AIC <- renderText({ AIC(Rphi_glm_log())})
-# Fruit
-
-
-# data outputs
+## Multispeq
+### FvP/FmP statistical outputs
+  output$fvp_glm_gamma <- renderPrint({ summary(Rfvp_glm_gamma())})
+  output$fvp_glm_gamma_r2 <- renderPrint({ r.squaredGLMM(Rfvp_glm_gamma())})
+  output$fvp_glm_gamma_AIC <- renderText({ AIC(Rfvp_glm_gamma())})
+  output$fvp_glm_log <- renderPrint({ summary(Rfvp_glm_log())})
+  output$fvp_glm_log_r2 <- renderPrint({ r.squaredGLMM(Rfvp_glm_log())})
+  output$fvp_glm_log_AIC <- renderText({ AIC(Rfvp_glm_log())})
+###Phi2 statistical outputs
+  output$p2_glm_gamma <- renderPrint({ summary(Rp2_glm_gamma())})
+  output$p2_glm_gamma_r2 <- renderPrint({ r.squaredGLMM(Rp2_glm_gamma())})
+  output$p2_glm_gamma_AIC <- renderText({ AIC(Rp2_glm_gamma())})
+  output$p2_glm_log <- renderPrint({ summary(Rp2_glm_log())})
+  output$p2_glm_log_r2 <- renderPrint({ r.squaredGLMM(Rp2_glm_log())})
+  output$p2_glm_log_AIC <- renderText({ AIC(Rp2_glm_log())})
+## data outputs
   output$li_DT <- renderDT({
     RLi_data()
   })
@@ -1028,8 +1207,226 @@ server <- function(input, output) {
     Rm_data()
   })
 
-# Fruit outputs
-}
+# Fruit
+## Distributions
+### Mass
+#### mass multiKS output
+output$mass_mKS <- renderPrint({
+  x <- RFl_data()$mass
+  ds <- Rmass_dists()
+  o <- multiKS_cont(x, ds)
+  return(o)
+})
+#### mass PDF plot
+output$mass_pdf <- renderPlot({
+  x <- RFl_data()$mass
+  ds <- Rmass_dists()
+  p <- multiPDF_plot(x, 100, ds)+
+    labs(title="")+
+    theme_bw()+
+    scale_color_scico_d(begin=0.9, end=0, palette = gettext(Rpalette()))+
+    ylab("PDF")+
+    xlab("Mass")+
+    theme(
+      text = element_text(size=20, family="mont"),
+      legend.position="inside",
+      legend.position.inside = c(.75,.6),
+      legend.title = element_text(size=24, family = "mont", face= "bold"),
+      axis.title = element_text(size=24, family = "mont", face= "bold"),
+    )
+  return(p)
+}) # end mass PDF output
+#### mass CDF Plot
+output$mass_cdf <- renderPlot({
+  x <- RFl_data()$mass
+  ds <- Rmass_dists()
+  p <- multiCDF_plot(x, 100, ds)+
+    labs(title="")+
+    theme_bw()+
+    scale_color_scico_d(begin=0.9, end=0, palette = gettext(Rpalette()))+
+    ylab("CDF")+
+    xlab("Mass")+
+    theme(
+      text = element_text(size=20, family="mont"),
+      legend.position="inside",
+      legend.position.inside = c(.75,.6),
+      legend.title = element_text(size=24, family = "mont", face= "bold"),
+      axis.title = element_text(size=24, family = "mont", face= "bold"),
+    )
+  return(p)
+})
+
+# mass homoscedasticity tests
+output$mass_levene <- renderPrint({
+  leveneTest(mass~Treatment, data=RFl_data())
+})
+output$mass_bartlett <- renderPrint({
+  bartlett.test(mass~Treatment, data=RFl_data())
+})
+### Sugar
+#### sug multiKS output
+output$sug_mKS <- renderPrint({
+  x <- na.omit(RFl_data()$sugar_avg)
+  ds <- Rsug_dists()
+  o <- multiKS_cont(x, ds)
+  return(o)
+})
+#### mass PDF plot
+output$sug_pdf <- renderPlot({
+  x <- na.omit(RFl_data()$sugar_avg)
+  ds <- Rsug_dists()
+  p <- multiPDF_plot(x, 100, ds)+
+    labs(title="")+
+    theme_bw()+
+    scale_color_scico_d(begin=0.9, end=0, palette = gettext(Rpalette()))+
+    ylab("PDF")+
+    xlab("Sugar Concentration")+
+    theme(
+      text = element_text(size=20, family="mont"),
+      legend.position="inside",
+      legend.position.inside = c(.75,.6),
+      legend.title = element_text(size=24, family = "mont", face= "bold"),
+      axis.title = element_text(size=24, family = "mont", face= "bold"),
+    )
+  return(p)
+}) # end mass PDF output
+#### mass CDF Plot
+output$sug_cdf <- renderPlot({
+  x <- na.omit(RFl_data()$sugar_avg)
+  ds <- Rsug_dists()
+  p <- multiCDF_plot(x, 100, ds)+
+    labs(title="")+
+    theme_bw()+
+    scale_color_scico_d(begin=0.9, end=0, palette = gettext(Rpalette()))+
+    ylab("CDF")+
+    xlab("Sugar Concentration")+
+    theme(
+      text = element_text(size=20, family="mont"),
+      legend.position="inside",
+      legend.position.inside = c(.75,.6),
+      legend.title = element_text(size=24, family = "mont", face= "bold"),
+      axis.title = element_text(size=24, family = "mont", face= "bold"),
+    )
+  return(p)
+})
+
+# mass homoscedasticity tests
+output$sug_levene <- renderPrint({
+  leveneTest(sugar_avg~Treatment, data=RFl_data())
+})
+output$sug_bartlett <- renderPrint({
+  bartlett.test(sugar_avg~Treatment, data=RFl_data())
+})
+
+## fruit interactive scatter plot
+output$fruit_scatter <- renderPlot({
+  fs <- ggplot(data = RFl_data(), aes(x=.data[[Rfruit_x()]], y = .data[[Rfruit_y()]],
+                                      color = .data[[Rfruit_col()]])) +
+    geom_jitter(width=Rfruit_jit())+
+    scale_color_scico(begin=0.9, end=0, palette=Rpalette())+
+    scale_x_discrete(guide=guide_axis(check.overlap=TRUE))+
+    theme_minimal()+
+    ylab(gettext(Rfruit_y()))+
+    xlab(gettext(Rfruit_x()))+
+    theme(
+      text = element_text(size=24, family="mont"),
+      axis.title = element_text(size=24, family = "mont", face= "bold"),
+      title = element_text(size=30, family="open", face="bold", lineheight = .5)
+    )
+  if (Rfruit_fwrap() ==TRUE){
+    fs <- fs + facet_wrap(~Treatment)
+  }
+  return(fs)
+})
+
+## mass boxplot
+output$mass_box <- renderPlot({
+  pbox <- ggplot(data = RFl_data(), aes(x= Treatment, y = mass, fill=Treatment, color=Treatment)) +
+    geom_boxplot(alpha=.5, width=0.25)+
+    geom_violin(alpha=0.5, width=1)+
+    geom_jitter( width=.2, height=0)+
+    scale_fill_scico_d(begin=0.9, end=0, palette=Rpalette())+
+    scale_color_scico_d(begin=0.9, end=0, palette=Rpalette())+
+    ylab("Mass (g)")+
+    theme_minimal()+
+    theme(
+      legend.position="none",
+      text = element_text(size=24, family="mont", lineheight=0.5),
+      axis.title = element_text(size=24, family = "mont", face= "bold"),
+      title = element_text(size=30, family="open", face="bold")
+    )
+  if (Rfruit_box_stats() == TRUE) {
+    if (Rfb_labels() == "Pvalues") {
+      pbox <- pbox +
+        stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Transplantation", "Germination"), c("Transplantation", "Germ+Trans"), c("Germination", "Germ+Trans")), size=8, family="mont")+
+        stat_compare_means(label.x=3, size=8,family="mont")
+    } else {
+      pbox <- pbox +
+        stat_compare_means(label = "p.signif", comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Transplantation", "Germination"), c("Transplantation", "Germ+Trans"), c("Germination", "Germ+Trans")), size=8, family="mont")+
+        stat_compare_means(label = "p.signif", label.x=3, size=8, family="mont")
+    }
+  }
+  return(pbox)
+})
+
+## sugar boxplot
+output$sug_box <- renderPlot({
+  pbox <- ggplot(data = RFl_data(), aes(x= Treatment, y = sugar_avg, fill=Treatment, color=Treatment)) +
+    geom_boxplot(alpha=.5, width=0.25)+
+    geom_violin(alpha=0.5, width=1)+
+    geom_jitter( width=.2, height=0)+
+    scale_fill_scico_d(begin=0.9, end=0, palette=Rpalette())+
+    scale_color_scico_d(begin=0.9, end=0, palette=Rpalette())+
+    ylab("Sugar Concentration (%)")+
+    theme_minimal()+
+    theme(
+      legend.position="none",
+      text = element_text(size=24, family="mont", lineheight=0.5),
+      axis.title = element_text(size=24, family = "mont", face= "bold"),
+      title = element_text(size=30, family="open", face="bold")
+    )
+  if (Rfruit_box_stats() == TRUE) {
+    if (Rfb_labels() == "Pvalues") {
+      pbox <- pbox +
+        stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Transplantation", "Germination"), c("Transplantation", "Germ+Trans"), c("Germination", "Germ+Trans")), size=8, family="mont")+
+        stat_compare_means(label.x=3, size=8,family="mont")
+    } else {
+      pbox <- pbox +
+        stat_compare_means(label = "p.signif", comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Transplantation", "Germination"), c("Transplantation", "Germ+Trans"), c("Germination", "Germ+Trans")), size=8, family="mont")+
+        stat_compare_means(label = "p.signif", label.x=3, size=8, family="mont")
+    }
+  }
+  return(pbox)
+})
+
+# Fruit statistial outputs
+### Mass statistical outputs
+output$mass_glm_gamma <- renderPrint({ summary(Rmass_glm_gamma())})
+output$mass_glm_gamma_r2 <- renderPrint({ r.squaredGLMM(Rmass_glm_gamma())})
+output$mass_glm_gamma_AIC <- renderText({ AIC(Rmass_glm_gamma())})
+output$mass_glm_log <- renderPrint({ summary(Rmass_glm_log())})
+output$mass_glm_log_r2 <- renderPrint({ r.squaredGLMM(Rmass_glm_log())})
+output$mass_glm_log_AIC <- renderText({ AIC(Rmass_glm_log())})
+output$mass_glm_normal <- renderPrint({ summary(Rmass_glm_normal())})
+output$mass_glm_normal_r2 <- renderPrint({ r.squaredGLMM(Rmass_glm_normal())})
+output$mass_glm_normal_AIC <- renderText({ AIC(Rmass_glm_normal())})
+### sugar statistical outputs
+output$sug_glm_gamma <- renderPrint({ summary(Rsug_glm_gamma())})
+output$sug_glm_gamma_r2 <- renderPrint({ r.squaredGLMM(Rsug_glm_gamma())})
+output$sug_glm_gamma_AIC <- renderText({ AIC(Rsug_glm_gamma())})
+output$sug_glm_log <- renderPrint({ summary(Rsug_glm_log())})
+output$sug_glm_log_r2 <- renderPrint({ r.squaredGLMM(Rsug_glm_log())})
+output$sug_glm_log_AIC <- renderText({ AIC(Rsug_glm_log())})
+output$sug_glm_normal <- renderPrint({ summary(Rsug_glm_normal())})
+output$sug_glm_normal_r2 <- renderPrint({ r.squaredGLMM(Rsug_glm_normal())})
+output$sug_glm_normal_AIC <- renderText({ AIC(Rsug_glm_normal())})
+
+# fruit data output
+output$fruit_data <- renderDT({
+  RFl_data()
+})
+
+} # end server
 
 # run app
 shinyApp(ui = ui, server = server)
