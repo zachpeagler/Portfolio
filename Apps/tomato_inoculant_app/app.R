@@ -8,10 +8,16 @@ library(showtext)
 library(bslib)
 library(MASS)
 library(ggpubr)
+library(car)
 library(DT)
 library(rstatix)
 library(lme4)
 library(MuMIn)
+library(devtools)
+install_github("zachpeagler/multiFitR")
+library(multiFitR)
+install_github("zachpeagler/multiFitRgg")
+library(multiFitRgg)
 
 # graphical setup
 ## palettes
@@ -25,6 +31,10 @@ font_add_google("Montserrat", family = "mont")
 showtext_auto()
 ## shapes
 four_shapes = c(15,16,17,23)
+#distributions
+dists <- c("normal", "lognormal", "gamma", "exponential",
+           "cauchy", "weibull")
+sigcodes <- c("Psymbols", "Pvalues")
 # load data
 ## li600 data
 Li_data_file <- "TIP24_LI600.csv"
@@ -57,6 +67,41 @@ Qgsw <- quantile(Li_data$gsw, probs=c(.25, .75), na.rm=FALSE)
 Qps2 <- quantile(Li_data$PhiPS2, probs=c(.25, .75), na.rm=FALSE)
 iqr_gsw <- IQR(Li_data$gsw)
 iqr_ps2 <- IQR(Li_data$PhiPS2)
+## multispeq data
+m_data_file <- "TIP24_Multispeq.csv"
+m_data <- read.csv(m_data_file) %>%
+  mutate(Treatment = case_when(
+    Row=="A"~"Control",
+    Row=="B"~"Transplantation",
+    Row=="C"~"Germination",
+    Row=="D"~"Germ+Trans",
+    TRUE~NA),
+    Treatment = factor(Treatment, levels=c("Control", "Germination",
+                                           "Transplantation", "Germ+Trans")),
+    Row_num = case_when(
+      Row=="A"~ 1,
+      Row=="B"~ 2,
+      Row=="C"~ 3,
+      Row=="D"~ 4,
+      TRUE~NA),
+    plant_fac = as.factor(paste(Row_num, Pot)),
+    Date = as.Date(time, "%m/%d/%Y"),
+    Date = as.factor(Date),
+  )
+# trim the fat from the multispeq data
+m_data <- m_data[,c("Row", "Pot", "plant_fac", "Treatment", "Device.ID",
+                    "Leaf.Damage.", "Pests.Present.", "Time.of.Day",
+                    "Date", "time", "Phi2", "Light.Intensity..PAR.",
+                    "Leaf.Temperature", "FvP_over_FmP", "Ambient.Temperature",
+                    "Ambient.Humidity")]
+# set multispeq variables that will be used in scatter plot
+m_vars <- c("plant_fac", "Row", "Pot", "Treatment", "Device.ID", "Date",
+            "Time.of.Day", "Leaf.Damage.", "Pests.Present.",
+            "Leaf.Temperature", "FvP_over_FmP", "Phi2", "Ambient.Temperature", 
+            "Ambient.Humidity")
+Qp2 <- quantile(m_data$Phi2, probs=c(.25, .75), na.rm=FALSE)
+iqr_p2 <- IQR(m_data$Phi2)
+
 ## fruit data
 Fl_data_file <- "TIP24_Fruit.csv"
 Fl_data <- read.csv(Fl_data_file, stringsAsFactors = T) %>%
@@ -82,7 +127,8 @@ Fl_data <- read.csv(Fl_data_file, stringsAsFactors = T) %>%
     ripeness = abs(1-(penetrometer/max(na.omit(penetrometer))))
   )
 ## make fruit variables
-fruit_vars <- c()
+fruit_vars <- c("Treatment", "plant_fac", "BER", "fungus", "cracking", "date_analysis", "d_diff",
+                "mass", "sugar_avg", "ripeness")
 ## Get mass and sugar quantiles and IQR
 Qmass <- quantile(na.omit(Fl_data$mass), probs=c(.25, .75), na.rm=FALSE)
 Qsug <- quantile(na.omit(Fl_data$sugar_avg), probs=c(.25, .75), na.rm=FALSE)
@@ -93,119 +139,150 @@ ui <- navbarPage(title = "Tomato Inoculants",
                  theme = bs_theme(bg = "white",
                                   "navbar-fg" = sls8[1],
                                   fg=sls8[1], primary = sls8[5],
-                                  secondary = sls8[4], base_font = font_google("Open Sans")),
+                                  secondary = sls8[4],
+                                  base_font = font_google("Open Sans")),
                  sidebar = sidebar(
                    markdown("##### **Global Options**"),
                    selectInput("palette","Select color palette",
                                choices = p_palettes, selected = "bilbao"),
                     checkboxInput("outliers", "Exclude outliers", FALSE),
                    markdown("##### **Fluorescence Options**"),
-                    sliderInput("leak_pct", "Maximum allowable leak percent", min = 0, max = 100, value =10),
+                    sliderInput("leak_pct",
+                                "Maximum allowable leak percent",
+                                min = 0,
+                                max = 100,
+                                value =10),
                    markdown("##### **Fruit Options**"),
-                        checkboxInput("omitna", "Exclude fruit not analyzed for sugar", FALSE),
-                        checkboxInput("ber", "Exclude fruit w/ blossom end rot", FALSE)
+                        checkboxInput("omitna", "Exclude fruit not analyzed for sugar",
+                                      FALSE),
+                        checkboxInput("ber", "Exclude fruit w/ blossom end rot",
+                                      FALSE),
+                        sliderInput("min_mass",
+                                    "Minimum Tomato Mass (g)",
+                                    min = 0,
+                                    max = 100,
+                                    value = 0 )
                  ), # end global sidebar
    nav_panel("Fluorescence",
      tabsetPanel(
        tabPanel("Distributions",
+        card(card_header("Li-600", class = "bg-primary"),
         card(card_header("Stomatal Conductance (gsw)",
-                         class = "bg-primary"),
+                         class = "bg-secondary"),
+             card(layout_sidebar(sidebar = sidebar(
+               checkboxGroupInput("gsw_dists", "Distributions",
+                                  choices = dists, selected = c("normal", "lognormal", "gamma"))
+             ),
              card_body((layout_column_wrap(
-               card(card_header("Probability Distribution Function Plot"),
+               card(card_header("Probability Density Function Plot"),
                     card_body(plotOutput("gsw_pdf"))),
                card(card_header("Cumulative Distribution Function Plot"),
                     card_body(plotOutput("gsw_cdf")))
-             ))),
+             )))
+             )
+             ),
+             card(layout_column_wrap(
              card(card_header("One-sample Kolmogorov-Smirnov test results"),
-                  card_body("Add a blurb here about Kolmogorov-Smirnov tests."),
-                  card_body(layout_column_wrap(
-                    card(card_header("gsw vs normal disribution"),
-                         verbatimTextOutput({"gsw_nks"})
-                    ),
-                    card(card_header("gsw vs log-normal disribution"),
-                         verbatimTextOutput({"gsw_lnks"})
-                    ),
-                    card(card_header("gsw vs gamma disribution"),
-                         verbatimTextOutput({"gsw_gks"})
-                    )
-                  )),
-                  card_body(layout_column_wrap(
-                    value_box(
-                      theme = value_box_theme(bg = sls8[1]),
-                      title = "Normal p-value",
-                      value = textOutput("gsw_nks_p"),
-                      p("P-value < 0.05, indicating that the distribution of
-                        gsw is significantly different from the normal distribution.")
-                    ),
-                    value_box(
-                      theme = value_box_theme(bg = sls8[2]),
-                      title = "Log-normal p-value",
-                      value = textOutput("gsw_lnks_p"),
-                      p("P-value < 0.05, indicating that the distribution of
-                        gsw is significantly different from the log-normal distribution.")
-                    ),
-                    value_box(
-                      theme = value_box_theme(bg = sls8[3]),
-                      title = "Gamma p-value",
-                      value = textOutput("gsw_gks_p"),
-                      p("P-value < 0.05, indicating that the distribution of
-                        gsw is significantly different from the Gamma distribution.")
-                    )
-                  ))),
-             card(card_body("Based on the above analysis, we can proceed under the assumption
-       that stomatal conductance follows either log normal or
-       gamma distribution."))
-                ),
+                  verbatimTextOutput("gsw_mKS")
+             ),
+             card(card_header("Tests for Homogeneity of Variances"),
+             card(card_header("Levene Test"),
+                  verbatimTextOutput("gsw_levene")
+             ),
+             card(card_header("Bartlett Test"),
+                  verbatimTextOutput("gsw_bartlett")
+                  )
+             )
+             ))
+            ),
        card(card_header("Efficiency of Photosystem II (PhiPS2)",
                         class = "bg-secondary"),
+            card(layout_sidebar(sidebar = sidebar(
+              checkboxGroupInput("phi_dists", "Distributions",
+                                 choices = dists, selected = c("normal", "lognormal", "gamma"))
+            ),
             card_body(layout_column_wrap(
-              card(card_header("Probability Distribution Function Plot"),
+              card(card_header("Probability Density Function Plot"),
                    card_body(plotOutput("phi_pdf"))),
               card(card_header("Cumulative Distribution Function Plot"),
                    card_body(plotOutput("phi_cdf")))
-            ),
-            card(card_header("One-sample Kolmogorov-Smirnov test results"),
-                 card_body(layout_column_wrap(
-                   card(card_header("PhiPS2 vs normal disribution"),
-                        verbatimTextOutput({"phi_nks"})
-                   ),
-                   card(card_header("PhiPS2 vs log-normal disribution"),
-                        verbatimTextOutput({"phi_lnks"})
-                   ),
-                   card(card_header("PhiPS2 vs gamma disribution"),
-                        verbatimTextOutput({"phi_gks"})
-                   )
-                 )),
-                 card_body(layout_column_wrap(
-                   value_box(
-                     theme = value_box_theme(bg = sls8[5]),
-                     title = "Normal p-value",
-                     value = textOutput("phi_nks_p"),
-                     p("P-value < 0.05, indicating that the distribution of
-                       PhiPS2 is significantly different from the normal distribution.")
-                   ),
-                   value_box(
-                     theme = value_box_theme(bg = sls8[6]),
-                     title = "Log-normal p-value",
-                     value = textOutput("phi_lnks_p"),
-                     p("P-value < 0.05, indicating that the distribution of
-                       PhiPS2 is significantly different from the log-normal distribution.")
-                   ),
-                   value_box(
-                     theme = value_box_theme(bg = sls8[7]),
-                     title = "Gamma p-value",
-                     value = textOutput("phi_gks_p"),
-                     p("P-value < 0.05, indicating that the distribution of
-                       PhiPS2 is significantly different from the Gamma distribution.")
-                   )
-                 )),
-                 card_body("Based on the above, it appears that PhiPS2 is significantly different from
-       normal, log-normal, and gamma distributions. I'm at a loss as to
-       how it is distributed. Bayesian inference may be required here."))
             ))
+            )),
+            card(layout_column_wrap(
+            card(card_header("One-sample Kolmogorov-Smirnov test results"),
+                 verbatimTextOutput("Lphi_mKS")
+            ),
+            card(card_header("Tests for Homogeneity of Variances"),
+            card(card_header("Levene Test"),
+                 verbatimTextOutput("phi_levene")
+            ),
+            card(card_header("Bartlett Test"),
+                 verbatimTextOutput("phi_bartlett")
+            )
+            )
+            ))
+            ) #end PhiPS2
+        ), # end Li-600
+       card(card_header("MultispeQ", class = "bg-primary"),
+            card(card_header("FvP over FmP",
+                             class = "bg-secondary"),
+                 card(layout_sidebar(sidebar = sidebar(
+                   checkboxGroupInput("fvp_dists", "Distributions",
+                                      choices = dists, selected = c("normal", "lognormal", "gamma"))
+                 ),
+                 card_body((layout_column_wrap(
+                   card(card_header("Probability Density Function Plot"),
+                        card_body(plotOutput("fvp_pdf"))),
+                   card(card_header("Cumulative Distribution Function Plot"),
+                        card_body(plotOutput("fvp_cdf")))
+                 )))
+                 )
+                 ),
+                 card(layout_column_wrap(
+                 card(card_header("One-sample Kolmogorov-Smirnov test results"),
+                      verbatimTextOutput("fvp_mKS")
+                 ),
+                 card(card_header("Tests for Homogeneity of Variances"),
+                 card(card_header("Levene Test"),
+                      verbatimTextOutput("fvp_levene")
+                      ),
+                 card(card_header("Bartlett Test"),
+                      verbatimTextOutput("fvp_bartlett")
+                 )
+                 )
+                 ))
+            ),
+            card(card_header("Efficiency of Photosystem II (PhiPS2)",
+                             class = "bg-secondary"),
+                 card(layout_sidebar(sidebar = sidebar(
+                   checkboxGroupInput("p2_dists", "Distributions",
+                                      choices = dists, selected = c("normal", "lognormal", "gamma"))
+                 ),
+                 card_body(layout_column_wrap(
+                   card(card_header("Probability Density Function Plot"),
+                        card_body(plotOutput("p2_pdf"))),
+                   card(card_header("Cumulative Distribution Function Plot"),
+                        card_body(plotOutput("p2_cdf")))
+                 ))
+                 )),
+                 card(layout_column_wrap(
+                 card(card_header("One-sample Kolmogorov-Smirnov test results"),
+                      verbatimTextOutput("p2_mKS")
+                 ),
+                 card(card_header("Tests for Homogeneity of Variances"),
+                 card(card_header("Levene Test"),
+                      verbatimTextOutput("p2_levene")
+                 ),
+                 card(card_header("Bartlett Test"),
+                      verbatimTextOutput("p2_bartlett")
+                 )
+                 )
+                 ))
+            ) #end PhiPS2
+            )
        ), # end distributions tab
        tabPanel("Plots",
-                card(card_header("Interactive Scatter Plot",
+                card(card_header("Interactive Li-600 Scatter",
                                  class = "bg-primary"),
                      layout_sidebar(sidebar = sidebar(
                        selectInput("fluoro_x","X Variable",
@@ -214,26 +291,51 @@ ui <- navbarPage(title = "Tomato Inoculants",
                                    choices = fluoro_vars, selected = "gsw"),
                        selectInput("fluoro_col","Color Variable",
                                    choices = fluoro_vars, selected = "rh_s"),
-                       sliderInput("fluoro_jit", "Jitter Amount", min=0, max=10, value =0),
+                       sliderInput("fluoro_jit", "Jitter Amount", min=0, max=10, value =3),
                        checkboxInput("fluoro_fwrap", "Individual Plot Per Treatment", FALSE)
                      ),
                      card_body(plotOutput("fluoro_scatter")))
                 ),
+                card(card_header("Interactive MultispeQ Scatter",
+                                 class = "bg-primary"),
+                     layout_sidebar(sidebar = sidebar(
+                       selectInput("m_x","X Variable",
+                                   choices = m_vars, selected = "Date"),
+                       selectInput("m_y","Y Variable",
+                                   choices = m_vars, selected = "FvP_over_FmP"),
+                       selectInput("m_col","Color Variable",
+                                   choices = m_vars, selected = "Ambient.Humidity"),
+                       sliderInput("m_jit", "Jitter Amount", min=0, max=10, value =3),
+                       checkboxInput("m_fwrap", "Individual Plot Per Treatment", FALSE)
+                     ),
+                     card_body(plotOutput("m_scatter")))
+                ),
                 card(card_header("Boxplots", class = "bg-secondary"),
-                     checkboxInput("fluoro_box_stats", "Show Statistical Tests", FALSE),
+                       checkboxInput("fluoro_box_stats", "Show Statistical Tests", FALSE),
+                       selectInput("bs_labels", "Show P symbols or P values",
+                                   sigcodes, "Pvalues"),
+                     card(card_header("Li-600", class = "bg-primary"),
                      card_body(layout_column_wrap(
                        card(card_header("Stomatal Conductance (gsw)"),
                             card_body(plotOutput("gsw_box"))),
                        card(card_header("Efficiency of Photosystem II (PhiPS2)"),
                             card_body(plotOutput("phi_box")))
-                     )), # end card_body
+                     ))),
+                     card(card_header("MultispeQ", class = "bg-primary"),
+                          card_body(layout_column_wrap(
+                            card(card_header("Efficiency of Photosystem II (PhiPS2)"),
+                                 card_body(plotOutput("p2_box"))),
+                            card(card_header("Efficiency of Open Reaction Centers in Light"),
+                                 card_body(plotOutput("fvp_box")))
+                          ))),
                      card(markdown("The above boxplots use [Kruskal-Wallis tests](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test)
                                   for the comparison of all group means and [Mann-Whitney U tests](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test)
                                   for pairwise comparisons between treatment groups."))
-                ) # end sidebar layout and card
+                )
        ), # end plot tab
        tabPanel("Statistical Tests",
-                card(card_header("Stomatal Conductance (gsw)"),
+                card(card_header("Li-600", class = "bg-primary"),
+                card(card_header("Stomatal Conductance (gsw)", class = "bg-secondary"),
                      card_body("Based on the exploratory analysis, either a gamma or
         log-normal distribution are appropriate for gsw. To determine the
         effect Treatment has on gsw, we'll use a generalized linear model with
@@ -259,7 +361,7 @@ ui <- navbarPage(title = "Tomato Inoculants",
                ))
           )
         ))), # end gsw card
-        card(card_header("Photosystem II Efficiency (PhiPS2)"),
+        card(card_header("Photosystem II Efficiency (PhiPS2)", class = "bg-secondary"),
              card_body("Based on the exploratory analysis, PhiPS2 does not match any distribution.
                        Therefore, we will use our biological reasoning and look at what distribution PhiPS2
                        was most alike on the PDF and CDF. On a biological level, PhiPS2 is the efficiency of
@@ -287,12 +389,25 @@ ui <- navbarPage(title = "Tomato Inoculants",
                 )
             ))
           )
+       ),
+       card(card_header("MultispeQ", class = "bg-primary"),
+       )
+            
        ), # end statistical tests panel
-       tabPanel("Data Explorer"
+       tabPanel("Data",
+                card(card_header("Li-600 Data", class = "bg-primary"),
+                DTOutput("li_DT")),
+                card(card_header("MultispeQ Data", class = "bg-secondary"),
+                DTOutput("m_DT"))
        ),
        tabPanel("Info",
-                card(markdown("Fluorescence measurements were taken biweekly with a LI-COR LI-600 over the course of the trial. Data is presented in a tidy format with each row representing a single observation and each column representing a variable. <br>
-       ### Explanatory Variables
+                card(markdown("Fluorescence measurements were taken biweekly with a LI-COR LI-600 
+                              and two PhotosynQ MultispeQ V2.0s over the course of the trial.
+                              Data is presented in a tidy format with each row representing a single
+                              observation and each column representing a variable. <br>
+                              
+       ### **Li-600**
+       #### Explanatory Variables
           **Treatment** is the inoculation timing of the tomato. Options are Control, Germination, Transplantation, and Germ+Trans. <br>
           **Time** is the time at which the measurement was taken. <br>
           **Date** is the date at which the measurement was taken. <br>
@@ -302,10 +417,19 @@ ui <- navbarPage(title = "Tomato Inoculants",
           **rh_s** is the relative humidity (add units) of the leaf. <br>
           **Tleaf** is the temperature (C) of the leaf. <br>
           **Qamb** is the ambient light level (add units) at the time of the observation.
-       ### Response Variables
+       #### Response Variables
           **gsw** is the stomatal conductance (mol m-2 s-1) of the leaf. <br>
-          **VPDleaf** is the vapor pressure deficit (add units) of the leaf. <br>
-          **PhiPS2** is the efficiency of photosystem II of the leaf. It is unitless. (0:1) <br>
+          **PhiPS2** is the quantum yield. It is unitless. (0:1) <br>
+       ### **MultispeQ**   
+        #### Explanatory Variables
+          **Treatment** is the inoculation timing of the tomato. Options are Control, Germination, Transplantation, and Germ+Trans. <br>
+          **Date** is the date at which the measurement was taken. <br>
+          **Row** is the row number of the tomato. (1:4) <br>
+          **Pot** is the pot number of the tomato. (1:12) <br>
+          **plant_fac** is a combination of *Row* and *Pot*, and acts as an ID for every individual plant. (1 1: 4 12) <br>
+        #### Response Variables
+          **PhiPS2** is the quantum yield. It is unitless. (0:1) <br>
+          **FvP_over_FmP** is the efficiency of open reaction centers in light.<br>
           "))
        )
      ) # end tab set
@@ -316,14 +440,14 @@ ui <- navbarPage(title = "Tomato Inoculants",
       tabPanel("Distributions",
         card(card_header("Sugar"),
           card_body(layout_column_wrap(
-            card(card_header("Probability Distribution Function Plot"),
+            card(card_header("Probability Density Function Plot"),
               card_body(plotOutput("sug_pdf"))),
             card(card_header("Cumulative Distribution Function Plot"),
               card_body(plotOutput("sug_cdf")))
               ))),
         card(card_header("Mass"),
           card_body(layout_column_wrap(
-            card(card_header("Probability Distribution Function Plot"),
+            card(card_header("Probability Density Function Plot"),
               card_body(plotOutput("mass_pdf"))),
             card(card_header("Cumulative Distribution Function Plot"),
               card_body(plotOutput("mass_cdf")))
@@ -339,7 +463,7 @@ ui <- navbarPage(title = "Tomato Inoculants",
                                   choices = fruit_vars, selected = "mass"),
                       selectInput("fruit_col","Color Variable",
                                   choices = fluoro_vars, selected = "sugar_avg"),
-                      sliderInput("fruit_jit", "Jitter Amount", min=0, max=10, value =0),
+                      sliderInput("fruit_jit", "Jitter Amount", min=0, max=10, value =3),
                       checkboxInput("fruit_fwrap", "Individual Plot Per Treatment", FALSE)
                     ),
                     card_body(plotOutput("fruit_scatter")))
@@ -359,59 +483,54 @@ ui <- navbarPage(title = "Tomato Inoculants",
       ),
       tabPanel("Statistical Tests",
                card(card_header("Mass"),
-                card_body(markdown("")),
+                card_body(markdown("Mass stat tests blurb yabadabadebop.")),
                 card_body(layout_column_wrap(
                  card(card_header("GLM with Gamma family and log link"),
-                      card_body(verbatimTextOutput("gsw_glm_gamma"), max_height= 500),
+                      card_body(verbatimTextOutput("mass_glm_gamma"), max_height= 500),
                       card_body(layout_column_wrap(
                         card(card_header("Pseudo-R2"),
-                             card_body(verbatimTextOutput("gsw_glm_gamma_r2"))),
-                        value_box(title = "AIC", value = textOutput("gsw_glm_gamma_AIC"))
+                             card_body(verbatimTextOutput("mass_glm_gamma_r2"))),
+                        value_box(title = "AIC", value = textOutput("mass_glm_gamma_AIC"))
                       ))
                  ),
                  card(card_header("GLM with gaussian family and log link"),
-                      card_body(verbatimTextOutput("gsw_glm_log"), max_height= 500),
+                      card_body(verbatimTextOutput("mass_glm_log"), max_height= 500),
                       card_body(layout_column_wrap(
                         card(card_header("Pseudo-R2"),
-                             card_body(verbatimTextOutput("gsw_glm_log_r2"))),
-                        value_box(title = "AIC", value = textOutput("gsw_glm_log_AIC"))
+                             card_body(verbatimTextOutput("mass_glm_log_r2"))),
+                        value_box(title = "AIC", value = textOutput("mass_glm_log_AIC"))
                       ))
                  )
                ))), # end mass
                card(card_header("Sugar Concentration (%)"),
-                    card_body("Based on the exploratory analysis, PhiPS2 does not match any distribution.
-                       Therefore, we will use our biological reasoning and look at what distribution PhiPS2
-                       was most alike on the PDF and CDF. On a biological level, PhiPS2 is the efficiency of
-                       a part of the clorophyll, and probably follows some sort of inverse square law, and based
-                       on the PDF it's a bit right skewed, making a Gamma distribution a possible choice for analysis. In all likelyhood,
-                       this should be evaluated using Bayesian inference.
-                       When constructing our model, we should also take into account fixed effects, such as ambient light (Qamb),
-                       and random effects, such as the pot along a row."),
+                    card_body("Based on the exploratory analysis, sugar is probably normal."),
                     card_body(layout_column_wrap(
                       card(card_header("GLM with Gamma family and log link"),
-                           card_body(verbatimTextOutput("phi_glm_gamma"), max_height= 500),
+                           card_body(verbatimTextOutput("sug_glm_normal"), max_height= 500),
                            card_body(layout_column_wrap(
                              card(card_header("Pseudo-R2"),
-                                  card_body(verbatimTextOutput("phi_glm_gamma_r2"))),
-                             value_box(title = "AIC", value = textOutput("phi_glm_gamma_AIC"))
+                                  card_body(verbatimTextOutput("sug_glm_normal_r2"))),
+                             value_box(title = "AIC", value = textOutput("sug_glm_normal_AIC"))
                            ))
                       ),
                       card(card_header("GLM with gaussian family and log link"),
-                           card_body(verbatimTextOutput("phi_glm_log"), max_height= 500),
+                           card_body(verbatimTextOutput("sug_glm_log"), max_height= 500),
                            card_body(layout_column_wrap(
                              card(card_header("Pseudo-R2"),
-                                  card_body(verbatimTextOutput("phi_glm_log_r2"))),
-                             value_box(title = "AIC", value = textOutput("phi_glm_log_AIC"))
+                                  card_body(verbatimTextOutput("sug_glm_log_r2"))),
+                             value_box(title = "AIC", value = textOutput("sug_glm_log_AIC"))
                            ))
                       )
                     ))) # end sugar
                ),
-      tabPanel("Data Explorer",
+      tabPanel("Data",
+               DTOutput("fruit_data")
       ),
       tabPanel("Info",
          card(
           card_body(
-            markdown("The tomatoes were grown in 4 rows of 12 pots each, with each row corresponding to a different inoculation treatment. The data table below is formatted in a tidy format with each row corresponding to one fruit and each column representing a variable.<br>
+            markdown("The tomatoes were grown in 4 rows of 12 pots each, with each row corresponding to a different inoculation treatment.
+                     The data table is formatted in a tidy format with each row corresponding to one fruit and each column representing a variable.<br>
                       ### Explanatory Variables <br>
                       **Treatment** is the inoculation timing of the tomato. Options are Control, Germination, Transplantation, and Germ+Trans. <br>
                       **row** is the row number of the tomato. (1:4) <br>
@@ -449,7 +568,19 @@ server <- function(input, output) {
   Rfluoro_jit <- reactive({input$fluoro_jit * .1})
   Rfluoro_fwrap <- reactive({input$fluoro_fwrap})
   Rfluoro_box_stats <- reactive({input$fluoro_box_stats})
-### Reactive dataframes
+  Rbs_labels <- reactive({input$bs_labels})
+  Rm_x <- reactive({input$m_x})
+  Rm_y <- reactive({input$m_y})
+  Rm_col <- reactive({input$m_col})
+  Rm_jit <- reactive({input$m_jit * .1})
+  Rm_fwrap <- reactive({input$m_fwrap})
+  Rm_box_stats <- reactive({input$m_box_stats})
+  Rgsw_dists <- reactive({input$gsw_dists})
+  Rphi_dists <- reactive({input$phi_dists})
+  Rp2_dists <- reactive({input$p2_dists})
+  Rfvp_dists <- reactive({input$fvp_dists})
+
+  ### Reactive dataframes
   RLi_data <- reactive({
     x <- Li_data
     if (input$outliers == TRUE) {
@@ -459,6 +590,14 @@ server <- function(input, output) {
                 PhiPS2 < (Qps2[2]+1.5*iqr_ps2))
     }
     x <- x %>% filter(leak_pct < Rleak_pct())
+    return(x)
+  })
+  Rm_data <- reactive({
+    x <- m_data
+    if (input$outliers == TRUE) {
+      x <- subset(x, Phi2 > (Qp2[1]-1.5*iqr_p2) &
+                    Phi2 < (Qp2[2]+1.5*iqr_p2))
+    }
     return(x)
   })
   RFl_data <- reactive({
@@ -475,6 +614,7 @@ server <- function(input, output) {
     if (input$omitna == TRUE){
       f <- na.omit(f)
     }
+    f <- subset(f, mass > input$min_mass)
     return(f)
   })
 ### Reactive GLMs
@@ -499,213 +639,219 @@ server <- function(input, output) {
 ## Fluorescence
 ### Distributions
 #### GSW
-  ## gsw distributions
-  gsw_n <- fitdistr(Li_data$gsw, "normal")
-  gsw_ln <- fitdistr(Li_data$gsw, "lognormal")
-  gsw_g <- fitdistr(Li_data$gsw, "gamma")
-  gsw_seq <- seq(min(Li_data$gsw), max(Li_data$gsw), by=0.001)
-
-  ### test gsw for gamma and plnorm distributions using ks test
-  gsw_gks <- ks.test(Li_data$gsw, "pgamma",shape=gsw_g$estimate[1],
-                                  rate=gsw_g$estimate[2])
-  gsw_lnks <- ks.test(Li_data$gsw, "plnorm",meanlog=gsw_ln$estimate[1],
-                                        sdlog=gsw_ln$estimate[2])
-  gsw_nks <- ks.test(Li_data$gsw, "pnorm",mean=gsw_n$estimate[1],
-                                       sd=gsw_n$estimate[2])
-  gsw_gks_p <- formatC(list2DF(ks.test(Li_data$gsw, "pgamma",shape=gsw_g$estimate[1],
-          rate=gsw_g$estimate[2])[2])[1,1], format = "e", digits = 3)
-  gsw_lnks_p <- formatC(list2DF(ks.test(Li_data$gsw, "plnorm",meanlog=gsw_ln$estimate[1],
-          sdlog=gsw_ln$estimate[2])[2])[1,1], format = "e", digits = 3)
-  gsw_nks_p <- formatC(list2DF(ks.test(Li_data$gsw, "pnorm",mean=gsw_n$estimate[1],
-          sd=gsw_n$estimate[2])[2])[1,1], format = "e", digits = 3)
-  output$gsw_gks <- renderPrint({
-    gsw_gks
+  ## Li-600 gsw multiKS output
+  output$gsw_mKS <- renderPrint({
+    x <- RLi_data()$gsw
+    gsw_dists <- Rgsw_dists()
+    o <- multiKS_cont(x, gsw_dists)
+    return(o)
   })
-  output$gsw_lnks <- renderPrint({
-    gsw_lnks
-  })
-  output$gsw_nks <- renderPrint({
-    gsw_nks
-  })
-  output$gsw_gks_p <- renderText({
-    gsw_gks_p
-  })
-  output$gsw_lnks_p <- renderText({
-    gsw_lnks_p
-  })
-  output$gsw_nks_p <- renderText({
-    gsw_nks_p
-  })
-
-## PDFs
-  gsw_pdf_n <- dnorm(gsw_seq, mean=gsw_n$estimate[1],
-                     sd=gsw_n$estimate[2])
-  gsw_pdf_ln <- dlnorm(gsw_seq, meanlog=gsw_ln$estimate[1],
-                       sdlog=gsw_ln$estimate[2])
-  gsw_pdf_g <- dgamma(gsw_seq, shape=gsw_g$estimate[1],
-                      rate=gsw_g$estimate[2])
-  gsw_pdf <- density(Li_data$gsw, n=length(gsw_pdf_ln))
-  gsw_pdf_df <- as.data.frame(gsw_seq) %>%
-    mutate(pdf_ln = gsw_pdf_ln,
-           pdf_n = gsw_pdf_n,
-           pdf_g = gsw_pdf_g)
 ## GSW PDF plot
   output$gsw_pdf <- renderPlot({
-    ggplot(gsw_pdf_df)+
-      geom_point(aes(x=gsw_seq, y=pdf_n, color="Normal"))+
-      geom_point(aes(x=gsw_seq, y=pdf_ln, color="Lognormal"))+
-      geom_point(aes(x=gsw_seq, y=pdf_g, color="Gamma"))+
-      geom_point(aes(x=gsw_pdf$x, y=gsw_pdf$y, color="Data"))+
+    x <- RLi_data()$gsw
+    gsw_dists <- Rgsw_dists()
+    p <- multiPDF_plot(x, 100, gsw_dists)+
+      labs(title="")+
       theme_bw()+
-      scale_color_scico_d(begin=.8, end=0, palette = gettext(Rpalette()))+
+      scale_color_scico_d(begin=0.9, end=0, palette = gettext(Rpalette()))+
       ylab("PDF")+
       xlab("gsw")+
       theme(
-        text = element_text(size=24, family="mont"),
+        text = element_text(size=20, family="mont"),
         legend.position="inside",
-        legend.position.inside = c(.85,.6),
+        legend.position.inside = c(.75,.6),
+        legend.title = element_text(size=24, family = "mont", face= "bold"),
         axis.title = element_text(size=24, family = "mont", face= "bold"),
       )
+    return(p)
   }) # end GSW PDF output
-## CDFs
-  gsw_cdf_n <- pnorm(gsw_seq, mean=gsw_n$estimate[1],
-                     sd=gsw_n$estimate[2])
-  gsw_cdf_ln <- plnorm(gsw_seq, meanlog=gsw_ln$estimate[1],
-                       sdlog=gsw_ln$estimate[2])
-  gsw_cdf_g <- pgamma(gsw_seq, shape=gsw_g$estimate[1],
-                      rate=gsw_g$estimate[2])
-  gsw_cdf <- ecdf(Li_data$gsw)(gsw_seq)
-
-  gsw_cdf_df <- as.data.frame(gsw_seq) %>%
-    mutate(cdf_ln = gsw_cdf_ln,
-           cdf_n = gsw_cdf_n,
-           cdf_g = gsw_cdf_g,
-           cdf = gsw_cdf)
 ## GSW CDF Plot
   output$gsw_cdf <- renderPlot({
-    ggplot(gsw_cdf_df)+
-      geom_point(aes(x=gsw_seq, y=cdf_n, color="Normal"))+
-      geom_point(aes(x=gsw_seq, y=cdf_ln, color="Lognormal"))+
-      geom_point(aes(x=gsw_seq, y=cdf_g, color="Gamma"))+
-      geom_point(aes(x=gsw_seq, y=cdf, color="Data"))+
+    x <- RLi_data()$gsw
+    gsw_dists <- Rgsw_dists()
+    p <- multiCDF_plot(x, 100, gsw_dists)+
+      labs(title="")+
       theme_bw()+
-      scale_color_scico_d(begin=.8, end=0, palette = gettext(Rpalette()))+
+      scale_color_scico_d(begin=0.9, end=0, palette = gettext(Rpalette()))+
       ylab("CDF")+
       xlab("gsw")+
       theme(
-        text = element_text(size=24, family="mont"),
+        text = element_text(size=20, family="mont"),
         legend.position="inside",
-        legend.position.inside = c(.85,.6),
+        legend.position.inside = c(.75,.6),
+        legend.title = element_text(size=24, family = "mont", face= "bold"),
         axis.title = element_text(size=24, family = "mont", face= "bold"),
       )
+    return(p)
   })
-
-## PhiPS2 distribution
-  PhiPS2_n <- fitdistr(Li_data$PhiPS2, "normal")
-  PhiPS2_ln <- fitdistr(Li_data$PhiPS2, "lognormal")
-  PhiPS2_g <- fitdistr(Li_data$PhiPS2, "gamma")
-  PhiPS2_seq <- seq(min(Li_data$PhiPS2), max(Li_data$PhiPS2), by=0.001)
-### test gsw for gamma and plnorm distributions using ks test
-  phi_gks <- ks.test(Li_data$g, "pgamma",shape=PhiPS2_g$estimate[1],
-                     rate=PhiPS2_g$estimate[2])
-  phi_lnks <- ks.test(Li_data$PhiPS2, "plnorm",meanlog=PhiPS2_ln$estimate[1],
-                      sdlog=PhiPS2_ln$estimate[2])
-  phi_nks <- ks.test(Li_data$PhiPS2, "pnorm",mean=PhiPS2_n$estimate[1],
-                     sd=PhiPS2_n$estimate[2])
-  phi_gks_p <- formatC(list2DF(ks.test(Li_data$PhiPS2, "pgamma",shape=PhiPS2_g$estimate[1],
-                                   rate=PhiPS2_g$estimate[2])[2])[1,1], format = "e", digits = 3)
-  phi_lnks_p <- formatC(list2DF(ks.test(Li_data$PhiPS2, "plnorm",meanlog=PhiPS2_ln$estimate[1],
-                                    sdlog=PhiPS2_ln$estimate[2])[2])[1,1], format = "e", digits = 3)
-  phi_nks_p <- formatC(list2DF(ks.test(Li_data$PhiPS2, "pnorm",mean=PhiPS2_n$estimate[1],
-                                   sd=PhiPS2_n$estimate[2])[2])[1,1], format = "e", digits = 3)
-## KS test outputs for value boxes
-  output$phi_gks <- renderPrint({
-    phi_gks
+## Li-600 PhiPS2 multiKS output
+  output$Lphi_mKS <- renderPrint({
+    x <- RLi_data()$PhiPS2
+    phi_dists <- Rphi_dists()
+    o <- multiKS_cont(x, phi_dists)
+    return(o)
   })
-  output$phi_lnks <- renderPrint({
-    phi_lnks
+# Li-600 Tests for homoscedasticity
+  output$gsw_levene <- renderPrint({
+    leveneTest(gsw~Treatment, data=RLi_data())
   })
-  output$phi_nks <- renderPrint({
-    phi_nks
+  output$gsw_bartlett <- renderPrint({
+    bartlett.test(gsw~Treatment, data=RLi_data())
   })
-  output$phi_gks_p <- renderText({
-    phi_gks_p
+  output$phi_levene <- renderPrint({
+    leveneTest(PhiPS2~Treatment, data=RLi_data())
   })
-  output$phi_lnks_p <- renderText({
-    phi_lnks_p
+  output$phi_bartlett <- renderPrint({
+    bartlett.test(PhiPS2~Treatment, data=RLi_data())
   })
-  output$phi_nks_p <- renderText({
-    phi_nks_p
+# Multispeq tests for homoscedasticity
+  output$p2_levene <- renderPrint({
+    leveneTest(Phi2~Treatment, data=Rm_data())
   })
-### PhiPS2 PDFs
-  PhiPS2_pdf_n <- dnorm(PhiPS2_seq, mean=PhiPS2_n$estimate[1],
-                        sd=PhiPS2_n$estimate[2])
-  PhiPS2_pdf_ln <- dlnorm(PhiPS2_seq, meanlog=PhiPS2_ln$estimate[1],
-                          sdlog=PhiPS2_ln$estimate[2])
-  PhiPS2_pdf_g <- dgamma(PhiPS2_seq, shape=PhiPS2_g$estimate[1],
-                         rate=PhiPS2_g$estimate[2])
-  PhiPS2_pdf <- density(Li_data$PhiPS2, n=length(PhiPS2_pdf_ln))
-  PhiPS2_pdf_df <- as.data.frame(PhiPS2_seq) %>%
-    mutate(pdf_ln = PhiPS2_pdf_ln,
-           pdf_n = PhiPS2_pdf_n,
-           pdf_g = PhiPS2_pdf_g)
-## PhiPS2 CDFs
-  PhiPS2_cdf_n <- pnorm(PhiPS2_seq, mean=PhiPS2_n$estimate[1],
-                        sd=PhiPS2_n$estimate[2])
-  PhiPS2_cdf_ln <- plnorm(PhiPS2_seq, meanlog=PhiPS2_ln$estimate[1],
-                          sdlog=PhiPS2_ln$estimate[2])
-  PhiPS2_cdf_g <- pgamma(PhiPS2_seq, shape=PhiPS2_g$estimate[1],
-                         rate=PhiPS2_g$estimate[2])
-  PhiPS2_cdf <- ecdf(Li_data$PhiPS2)(PhiPS2_seq)
-  PhiPS2_cdf_df <- as.data.frame(PhiPS2_seq) %>%
-    mutate(cdf_ln = PhiPS2_cdf_ln,
-           cdf_n = PhiPS2_cdf_n,
-           cdf_g = PhiPS2_cdf_g,
-           cdf = PhiPS2_cdf)
+  output$p2_bartlett <- renderPrint({
+    bartlett.test(Phi2~Treatment, data=Rm_data())
+  })
+  output$fvp_levene <- renderPrint({
+    leveneTest(FvP_over_FmP~Treatment, data=Rm_data())
+  })
+  output$fvp_bartlett <- renderPrint({
+    bartlett.test(FvP_over_FmP~Treatment, data=Rm_data())
+  })
 ## PhiPS2 PDF output
   output$phi_pdf <- renderPlot({
-    ggplot(PhiPS2_pdf_df)+
-      geom_point(aes(x=PhiPS2_seq, y=pdf_n, color="Normal"))+
-      geom_point(aes(x=PhiPS2_seq, y=pdf_ln, color="Lognormal"))+
-      geom_point(aes(x=PhiPS2_seq, y=pdf_g, color="Gamma"))+
-      geom_point(aes(x=PhiPS2_pdf$x, y=PhiPS2_pdf$y, color="Data"))+
+    x <- RLi_data()$PhiPS2
+    phi_dists <- Rphi_dists()
+    p <- multiPDF_plot(x, 100, phi_dists)+
+      labs(title="")+
       theme_bw()+
-      scale_color_scico_d(begin=.8, end=0, palette = gettext(Rpalette()))+
-      guides(color=guide_legend(title="Distribution"))+
+      scale_color_scico_d(begin=0.9, end=0, palette = gettext(Rpalette()))+
       ylab("PDF")+
       xlab("PhiPS2")+
       theme(
-        text = element_text(size=24, family="mont"),
+        text = element_text(size=20, family="mont"),
         legend.position="inside",
         legend.position.inside = c(.85,.6),
+        legend.title = element_text(size=24, family = "mont", face= "bold"),
         axis.title = element_text(size=24, family = "mont", face= "bold"),
       )
+    return(p)
   })
 ## PhiPS2 CDF Plot
   output$phi_cdf <- renderPlot({
-    ggplot(PhiPS2_cdf_df)+
-      geom_point(aes(x=PhiPS2_seq, y=cdf_n, color="Normal"))+
-      geom_point(aes(x=PhiPS2_seq, y=cdf_ln, color="Lognormal"))+
-      geom_point(aes(x=PhiPS2_seq, y=cdf_g, color="Gamma"))+
-      geom_point(aes(x=PhiPS2_seq, y=cdf, color="Data"))+
+    x <- RLi_data()$PhiPS2
+    phi_dists <- Rphi_dists()
+    p <- multiCDF_plot(x, 100, phi_dists)+
+      labs(title="")+
       theme_bw()+
-      scale_color_scico_d(begin=.8, end=0, palette = gettext(Rpalette()))+
-      guides(color=guide_legend(title="Distribution"))+
+      scale_color_scico_d(begin=0.9, end=0, palette = gettext(Rpalette()))+
       ylab("CDF")+
       xlab("PhiPS2")+
       theme(
-        text = element_text(size=24, family="mont"),
+        text = element_text(size=20, family="mont"),
         legend.position="inside",
-        legend.position.inside = c(.85,.6),
+        legend.position.inside = c(.75,.4),
+        legend.title = element_text(size=24, family = "mont", face= "bold"),
         axis.title = element_text(size=24, family = "mont", face= "bold"),
       )
+    return(p)
   })
-## Fluoro interactive scatter plot
+# Multispeq distributions
+  output$p2_mKS <- renderPrint({
+    x <- Rm_data()$Phi2
+    phi_dists <- Rp2_dists()
+    o <- multiKS_cont(x, phi_dists)
+    return(o)
+  })
+  output$fvp_mKS <- renderPrint({
+    x <- Rm_data()$FvP_over_FmP
+    fvp_dists <- Rfvp_dists()
+    o <- multiKS_cont(x, fvp_dists)
+    return(o)
+  })
+
+## Multispeq PhiPS2 PDF output
+  output$p2_pdf <- renderPlot({
+    x <- Rm_data()$Phi2
+    phi_dists <- Rp2_dists()
+    p <- multiPDF_plot(x, 100, phi_dists)+
+      labs(title="")+
+      theme_bw()+
+      scale_color_scico_d(begin=0.9, end=0, palette = gettext(Rpalette()))+
+      ylab("PDF")+
+      xlab("PhiPS2")+
+      theme(
+        text = element_text(size=20, family="mont"),
+        legend.position="inside",
+        legend.position.inside = c(.85,.6),
+        legend.title = element_text(size=24, family = "mont", face= "bold"),
+        axis.title = element_text(size=24, family = "mont", face= "bold"),
+      )
+    return(p)
+  })
+## Multispeq PhiPS2 CDF Plot
+  output$p2_cdf <- renderPlot({
+    x <- Rm_data()$Phi2
+    phi_dists <- Rp2_dists()
+    p <- multiCDF_plot(x, 100, phi_dists)+
+      labs(title="")+
+      theme_bw()+
+      scale_color_scico_d(begin=0.9, end=0, palette = gettext(Rpalette()))+
+      ylab("CDF")+
+      xlab("PhiPS2")+
+      theme(
+        text = element_text(size=20, family="mont"),
+        legend.position="inside",
+        legend.position.inside = c(.75,.4),
+        legend.title = element_text(size=24, family = "mont", face= "bold"),
+        axis.title = element_text(size=24, family = "mont", face= "bold"),
+      )
+    return(p)
+  })
+## FvP/FmP PDF output
+  output$fvp_pdf <- renderPlot({
+    x <- Rm_data()$FvP_over_FmP
+    ds <- Rfvp_dists()
+    p <- multiPDF_plot(x, 100, ds)+
+      labs(title="")+
+      theme_bw()+
+      scale_color_scico_d(begin=0.9, end=0, palette = gettext(Rpalette()))+
+      ylab("PDF")+
+      xlab("FvP/FmP")+
+      theme(
+        text = element_text(size=20, family="mont"),
+        legend.position="inside",
+        legend.position.inside = c(.85,.6),
+        legend.title = element_text(size=24, family = "mont", face= "bold"),
+        axis.title = element_text(size=24, family = "mont", face= "bold"),
+      )
+    return(p)
+  })
+## PhiPS2 CDF Plot
+  output$fvp_cdf <- renderPlot({
+    x <- Rm_data()$FvP_over_FmP
+    ds <- Rfvp_dists()
+    p <- multiCDF_plot(x, 100, ds)+
+      labs(title="")+
+      theme_bw()+
+      scale_color_scico_d(begin=0.9, end=0, palette = gettext(Rpalette()))+
+      ylab("CDF")+
+      xlab("FvP/FmP")+
+      theme(
+        text = element_text(size=20, family="mont"),
+        legend.position="inside",
+        legend.position.inside = c(.75,.4),
+        legend.title = element_text(size=24, family = "mont", face= "bold"),
+        axis.title = element_text(size=24, family = "mont", face= "bold"),
+      )
+    return(p)
+  })
+# Scatter plots
+## LI-600 interactive scatter plot
   output$fluoro_scatter <- renderPlot({
     fs <- ggplot(data = RLi_data(), aes(x=.data[[Rfluoro_x()]], y = .data[[Rfluoro_y()]],
                                color = .data[[Rfluoro_col()]])) +
             geom_jitter(width=Rfluoro_jit())+
-            scale_color_scico(begin=0.8, end=0, palette=Rpalette())+
+            scale_color_scico(begin=0.9, end=0, palette=Rpalette())+
             scale_x_discrete(guide=guide_axis(check.overlap=TRUE))+
             theme_minimal()+
             ylab(gettext(Rfluoro_y()))+
@@ -720,14 +866,34 @@ server <- function(input, output) {
     }
     return(fs)
   })
+## Multispeq interactive scatter plot
+  output$m_scatter <- renderPlot({
+    ms <- ggplot(data = Rm_data(), aes(x=.data[[Rm_x()]], y = .data[[Rm_y()]],
+                                        color = .data[[Rm_col()]])) +
+      geom_jitter(width=Rm_jit())+
+      scale_color_scico(begin=0.9, end=0, palette=Rpalette())+
+      scale_x_discrete(guide=guide_axis(check.overlap=TRUE))+
+      theme_minimal()+
+      ylab(gettext(Rm_y()))+
+      xlab(gettext(Rm_x()))+
+      theme(
+        text = element_text(size=24, family="mont"),
+        axis.title = element_text(size=24, family = "mont", face= "bold"),
+        title = element_text(size=30, family="open", face="bold", lineheight = .5)
+      )
+    if (Rm_fwrap() ==TRUE){
+      ms <- ms + facet_wrap(~Treatment)
+    }
+    return(ms)
+  })
 ## gsw boxplot
   output$gsw_box <- renderPlot({
     gbox <- ggplot(data = RLi_data(), aes(x= Treatment, y = gsw, fill=Treatment, color=Treatment)) +
       geom_boxplot(alpha=.5, width=0.25)+
       geom_violin(alpha=0.5, width=1)+
       geom_jitter( width=.2, height=0)+
-      scale_fill_scico_d(begin=0.8, end=0, palette=Rpalette())+
-      scale_color_scico_d(begin=0.8, end=0, palette=Rpalette())+
+      scale_fill_scico_d(begin=0.9, end=0, palette=Rpalette())+
+      scale_color_scico_d(begin=0.9, end=0, palette=Rpalette())+
       ylab("Stomatal Conductance (mol m-2 s-1)")+
       theme_minimal()+
       theme(
@@ -737,9 +903,15 @@ server <- function(input, output) {
         title = element_text(size=30, family="open", face="bold")
       )
     if (Rfluoro_box_stats() == TRUE) {
+      if (Rbs_labels() == "Pvalues") {
       gbox <- gbox +
         stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Transplantation", "Germination"), c("Transplantation", "Germ+Trans"), c("Germination", "Germ+Trans")), size=8, family="mont")+
         stat_compare_means(label.x=3, size=8,family="mont")
+      } else {
+      gbox <- gbox +
+        stat_compare_means(label = "p.signif", comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Transplantation", "Germination"), c("Transplantation", "Germ+Trans"), c("Germination", "Germ+Trans")), size=8, family="mont")+
+          stat_compare_means(label = "p.signif", label.x=3, size=8, family="mont")
+      }
     }
     return(gbox)
   })
@@ -749,8 +921,8 @@ server <- function(input, output) {
       geom_boxplot(alpha=.5, width=0.25)+
       geom_violin(alpha=0.5, width=1)+
       geom_jitter( width=.2, height=0)+
-      scale_fill_scico_d(begin=0.8, end=0, palette=Rpalette())+
-      scale_color_scico_d(begin=0.8, end=0, palette=Rpalette())+
+      scale_fill_scico_d(begin=0.9, end=0, palette=Rpalette())+
+      scale_color_scico_d(begin=0.9, end=0, palette=Rpalette())+
       ylab("PhiPS2")+
       theme_minimal()+
       theme(
@@ -760,9 +932,73 @@ server <- function(input, output) {
         title = element_text(size=30, family="open", face="bold")
       )
     if (Rfluoro_box_stats() == TRUE) {
-      pbox <- pbox +
-        stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Transplantation", "Germination"), c("Transplantation", "Germ+Trans"), c("Germination", "Germ+Trans")), size=8, family="mont")+
-        stat_compare_means(label.x=3, size=8,family="mont")
+      if (Rbs_labels() == "Pvalues") {
+        pbox <- pbox +
+          stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Transplantation", "Germination"), c("Transplantation", "Germ+Trans"), c("Germination", "Germ+Trans")), size=8, family="mont")+
+          stat_compare_means(label.x=3, size=8,family="mont")
+      } else {
+        pbox <- pbox +
+          stat_compare_means(label = "p.signif", comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Transplantation", "Germination"), c("Transplantation", "Germ+Trans"), c("Germination", "Germ+Trans")), size=8, family="mont")+
+          stat_compare_means(label = "p.signif", label.x=3, size=8, family="mont")
+      }
+    }
+    return(pbox)
+  })
+## multispeq PhiPS2 boxplot
+  output$p2_box <- renderPlot({
+    pbox <- ggplot(data = Rm_data(), aes(x= Treatment, y = Phi2, fill=Treatment, color=Treatment)) +
+      geom_boxplot(alpha=.5, width=0.25)+
+      geom_violin(alpha=0.5, width=1)+
+      geom_jitter( width=.2, height=0)+
+      scale_fill_scico_d(begin=0.9, end=0, palette=Rpalette())+
+      scale_color_scico_d(begin=0.9, end=0, palette=Rpalette())+
+      ylab("PhiPS2")+
+      theme_minimal()+
+      theme(
+        legend.position="none",
+        text = element_text(size=24, family="mont", lineheight=0.5),
+        axis.title = element_text(size=24, family = "mont", face= "bold"),
+        title = element_text(size=30, family="open", face="bold")
+      )
+    if (Rfluoro_box_stats() == TRUE) {
+      if (Rbs_labels() == "Pvalues") {
+        pbox <- pbox +
+          stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Transplantation", "Germination"), c("Transplantation", "Germ+Trans"), c("Germination", "Germ+Trans")), size=8, family="mont")+
+          stat_compare_means(label.x=3, size=8,family="mont")
+      } else {
+        pbox <- pbox +
+          stat_compare_means(label = "p.signif", comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Transplantation", "Germination"), c("Transplantation", "Germ+Trans"), c("Germination", "Germ+Trans")), size=8, family="mont")+
+          stat_compare_means(label = "p.signif", label.x=3, size=8, family="mont")
+      }
+    }
+    return(pbox)
+  })
+## multispeq fvp boxplot
+  output$fvp_box <- renderPlot({
+    pbox <- ggplot(data = Rm_data(), aes(x= Treatment, y = FvP_over_FmP, fill=Treatment, color=Treatment)) +
+      geom_boxplot(alpha=.5, width=0.25)+
+      geom_violin(alpha=0.5, width=1)+
+      geom_jitter( width=.2, height=0)+
+      scale_fill_scico_d(begin=0.9, end=0, palette=Rpalette())+
+      scale_color_scico_d(begin=0.9, end=0, palette=Rpalette())+
+      ylab("FvP/FmP")+
+      theme_minimal()+
+      theme(
+        legend.position="none",
+        text = element_text(size=24, family="mont", lineheight=0.5),
+        axis.title = element_text(size=24, family = "mont", face= "bold"),
+        title = element_text(size=30, family="open", face="bold")
+      )
+    if (Rfluoro_box_stats() == TRUE) {
+      if (Rbs_labels() == "Pvalues") {
+        pbox <- pbox +
+          stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Transplantation", "Germination"), c("Transplantation", "Germ+Trans"), c("Germination", "Germ+Trans")), size=8, family="mont")+
+          stat_compare_means(label.x=3, size=8,family="mont")
+      } else {
+        pbox <- pbox +
+          stat_compare_means(label = "p.signif", comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Transplantation", "Germination"), c("Transplantation", "Germ+Trans"), c("Germination", "Germ+Trans")), size=8, family="mont")+
+          stat_compare_means(label = "p.signif", label.x=3, size=8, family="mont")
+      }
     }
     return(pbox)
   })
@@ -783,87 +1019,16 @@ server <- function(input, output) {
   output$phi_glm_log_AIC <- renderText({ AIC(Rphi_glm_log())})
 # Fruit
 
-    mass_n <- fitdistr(Fl_data$mass, "normal")
-  mass_ln <- fitdistr(Fl_data$mass, "lognormal")
-  mass_g <- fitdistr(Fl_data$mass, "gamma")
 
-  mass_seq <- seq(min(Fl_data$mass), max(Fl_data$mass), by=0.1)
-  mass_pdf_n <- dnorm(mass_seq, mean=mass_n$estimate[1],
-                      sd=mass_n$estimate[2])
-  mass_pdf_ln <- dlnorm(mass_seq, meanlog=mass_ln$estimate[1],
-                        sdlog=mass_ln$estimate[2])
-  mass_pdf_g <- dgamma(mass_seq, shape=mass_g$estimate[1],
-                       rate=mass_g$estimate[2])
-  mass_pdf <- density(Fl_data$mass, n=length(mass_pdf_ln))
+# data outputs
+  output$li_DT <- renderDT({
+    RLi_data()
+  })
+  output$m_DT <- renderDT({
+    Rm_data()
+  })
 
-  mass_pdf_df <- as.data.frame(mass_seq) %>%
-    mutate(pdf_ln = mass_pdf_ln,
-           pdf_n = mass_pdf_n,
-           pdf_g = mass_pdf_g)
-
-  ## CDFs
-  mass_cdf_n <- pnorm(mass_seq, mean=mass_n$estimate[1],
-                      sd=mass_n$estimate[2])
-  mass_cdf_ln <- plnorm(mass_seq, meanlog=mass_ln$estimate[1],
-                        sdlog=mass_ln$estimate[2])
-  mass_cdf_g <- pgamma(mass_seq, shape=mass_g$estimate[1],
-                       rate=mass_g$estimate[2])
-  mass_cdf <- ecdf(Fl_data$mass)(mass_seq)
-
-  mass_cdf_df <- as.data.frame(mass_seq) %>%
-    mutate(cdf_ln = mass_cdf_ln,
-           cdf_n = mass_cdf_n,
-           cdf_g = mass_cdf_g,
-           cdf = mass_cdf)
-
-  ## Plot Mass PDF
-  ggplot(mass_pdf_df)+
-    geom_point(aes(x=mass_seq, y=pdf_n, color="Normal"))+
-    geom_point(aes(x=mass_seq, y=pdf_ln, color="Lognormal"))+
-    geom_point(aes(x=mass_seq, y=pdf_g, color="Gamma"))+
-    geom_point(aes(x=mass_pdf$x, y=mass_pdf$y, color="Data"))+
-    theme_bw()+
-    labs(title="PDF for mass data and possible distributions")+
-    ylab("PDF")+
-    xlab("mass")+
-    theme(
-      text = element_text(size=24, family="mont"),
-      legend.position="inside",
-      legend.position.inside = c(.85,.6),
-      axis.title = element_text(size=24, family = "mont", face= "bold"),
-      title = element_text(size=30, family="open", face="bold", lineheight = .5)
-    )
-
-  ## Plot Mass CDF
-  ggplot(mass_cdf_df)+
-    geom_point(aes(x=mass_seq, y=cdf_n, color="Normal"))+
-    geom_point(aes(x=mass_seq, y=cdf_ln, color="Lognormal"))+
-    geom_point(aes(x=mass_seq, y=cdf_g, color="Gamma"))+
-    geom_point(aes(x=mass_seq, y=cdf, color="Data"))+
-    theme_bw()+
-    labs(title="CDF for mass data and possible distributions")+
-    ylab("CDF")+
-    xlab("mass")+
-    theme(
-      text = element_text(size=24, family="mont"),
-      legend.position="inside",
-      legend.position.inside = c(.85,.6),
-      axis.title = element_text(size=24, family = "mont", face= "bold"),
-      title = element_text(size=30, family="open", face="bold", lineheight = .5)
-    )
-
-  ### test mass for gamma and plnorm distributions using ks test
-  ks.test(Fl_data$mass, "pgamma",shape=mass_g$estimate[1],
-          rate=mass_g$estimate[2])
-  ks.test(Fl_data$mass, "plnorm",meanlog=mass_ln$estimate[1],
-          sdlog=mass_ln$estimate[2])
-
-
-
-  ## Test for homoscedasticity
-#  leveneTest(Fl_data_no_BER$sugar_avg~Fl_data_no_BER$Treatment)
-#  leveneTest(Fl_data_no_BER$mass~Fl_data_no_BER$Treatment)
-
+# Fruit outputs
 }
 
 # run app

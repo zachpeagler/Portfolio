@@ -19,7 +19,9 @@ Hello! I'm Zach Peagler, a data scientist, R Shiny developer, and graduate stude
    6. [Farm products by state](README.md#16-us-state-family-farm-products)
    7. [Map of US family farms](README.md#17-us-family-farms)
 2. [Packages](README.md#2-packages)
-   1. [RdistUtils](README.md#21-rdistutils)
+   1. [multiFitR](README.md#21-multiFitR)
+   2. [multiFitRgg](README.md#22-multiFitRgg)
+   3. [multiFitRplotly](README.md#23-multiFitRplotly)
 3. [Analyses](README.md#3-analyses)
    1. [Localharvest](README.md#31-localharvest-analysis)
    2. [Tomato inoculants](README.md#32-tomato-inoculants-analysis)
@@ -106,11 +108,23 @@ This uses R, the packages tidyverse, shiny, showtext, scico, bslib, MASS, and gp
 
 # 2. Packages
 
-## 2.1 RdistUtils
+## 2.1 multiFitR
 
 An R package that helps with fitting multiple proportional density functions (PDFs), cumulative distribution functions (CDFs), and Kolmogorov-Smirnov tests.
 
-Check it out [here.](https://github.com/zachpeagler/RdistUtils)
+Check it out [here.](https://github.com/zachpeagler/multiFitR)
+
+## 2.2 multiFitRgg
+
+An R package that extends multiFitR's functionality to ggplot2 and provides functions for returning PDF and CDF plots with ggplot.
+
+Check it out [here.](https://github.com/zachpeagler/multiFitRgg)
+
+## 2.3 multiFitRplotly
+
+An R package that entends multiFitR to plotly and provides functions for returning PDF and CDF plots with traces for each chosen distribution.
+
+Check it out [here.](https://github.com/zachpeagler/multiFitRplotly)
 
 # 3. Analyses
 
