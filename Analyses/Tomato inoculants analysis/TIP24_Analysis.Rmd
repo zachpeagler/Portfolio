@@ -181,7 +181,7 @@ Make another pivot table to get the sum of fruit count, mass, and BER, fungus, a
 ```{r Fl_data, include=TRUE, echo=TRUE}
 
 ## Load and clean TIP24 fruit data
-Fl_data_file <- "C:/Github/Portfolio/R Shiny Apps/01 Tomato Inoculants 2024/TIP24_Fruit.csv"
+Fl_data_file <- "C:/Github/Portfolio/_data/tomato_inoculants/TIP24/TIP24_Fruit.csv"
 Fl_data <- read.csv(Fl_data_file, stringsAsFactors = T) %>%
   mutate(Treatment = case_when(
     row==1~"Control",

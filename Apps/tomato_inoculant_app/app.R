@@ -6,6 +6,7 @@ library(tidyverse)
 library(scico)
 library(showtext)
 library(bslib)
+library(bsicons)
 library(MASS)
 library(ggpubr)
 library(car)
@@ -23,8 +24,6 @@ library(multiFitRgg)
 ## palettes
 p_palettes <- scico_palette_names()
 bs_themes <- bootswatch_themes()
-sls8 <- c("#0d2b45", "#203c56", "#544e68", "#8d697a",
-          "#d08159", "#ffaa5e", "#ffd4a3", "#ffecd6")
 ## fonts
 font_add_google("Open Sans", family = "open")
 font_add_google("Montserrat", family = "mont")
@@ -116,56 +115,66 @@ Fl_data <- read.csv(Fl_data_file, stringsAsFactors = T) %>%
     date_harvest = parse_date_time(date_harvest, orders="mdy"),
     d_harvest = format(date_harvest, format="%d"),
     d_analysis = format(date_analysis, format="%d"),
+    Date_harvest = as.factor(date_harvest),
+    Date_analysis = as.factor(date_analysis),
     d_diff = abs(as.integer(d_analysis)-as.integer(d_harvest)),
     plant_fac = as.factor(paste(row, plant)),
     Treatment = factor(Treatment, levels=c("Control","Germination",
                                            "Transplantation",
                                            "Germ+Trans")),
-    BER = as.factor(BER),
-    fungus = as.factor(fungus),
-    cracking = as.factor(cracking),
+    BER = as.numeric(BER),
+    fungus = as.numeric(fungus),
+    cracking = as.numeric(cracking),
     ripeness = abs(1-(penetrometer/max(na.omit(penetrometer))))
   )
 ## make fruit variables
 fruit_vars <- c("Treatment", "plant_fac",
                 "BER", "fungus", "cracking",
-                "date_analysis", "d_diff",
+                "Date_harvest", "Date_analysis", "d_diff",
                 "mass", "sugar_avg", "ripeness")
 ## Get mass and sugar quantiles and IQR
 Qmass <- quantile(na.omit(Fl_data$mass), probs=c(.25, .75), na.rm=FALSE)
 Qsug <- quantile(na.omit(Fl_data$sugar_avg), probs=c(.25, .75), na.rm=FALSE)
 iqr_mass <- IQR(na.omit(Fl_data$mass))
 iqr_sug <- IQR(na.omit(Fl_data$sugar_avg))
+
+## harvest vars
+hvars <- c("fruit_sum", "mass_sum",
+           "BER_sum", "fungus_sum", "cracking_sum",
+           "pBER", "pfungus", "pcracking")
+
+## themes
+#light = bs_theme(bg = "white",
+#                 "navbar-fg" = sls8[1],
+#                 fg=sls8[1], primary = sls8[5],
+#                 secondary = sls8[4],
+#                 base_font = font_google("Open Sans"))
+light = bs_theme(bootswatch = "sandstone")
+dark = bs_theme(bootswatch = "darkly")
+
+## popovers
+gear <- popover(
+  bs_icon("gear"),
+  selectInput("palette","Select color palette",
+              choices = p_palettes, selected = "bilbao"),
+  checkboxInput("dark_mode", "Dark Mode", FALSE),
+  title = "Options"
+)
+link_github <- tags$a(bs_icon("GitHub"),
+                      href = "https://github.com/zachpeagler/Portfolio/tree/main/Apps/tomato_inoculant_app")
 ###### UI #####
 ui <- navbarPage(title = "Tomato Inoculants",
-                 theme = bs_theme(bg = "white",
-                                  "navbar-fg" = sls8[1],
-                                  fg=sls8[1], primary = sls8[5],
-                                  secondary = sls8[4],
-                                  base_font = font_google("Open Sans")),
-                 sidebar = sidebar(
-                   markdown("##### **Global Options**"),
-                   selectInput("palette","Select color palette",
-                               choices = p_palettes, selected = "bilbao"),
-                    checkboxInput("outliers", "Exclude outliers", FALSE),
-                   markdown("##### **Fluorescence Options**"),
-                    sliderInput("leak_pct",
-                                "Maximum allowable leak percent",
-                                min = 0,
-                                max = 100,
-                                value =10),
-                   markdown("##### **Fruit Options**"),
-                        checkboxInput("omitna", "Exclude fruit not analyzed for sugar",
-                                      FALSE),
-                        checkboxInput("ber", "Exclude fruit w/ blossom end rot",
-                                      FALSE),
-                        sliderInput("min_mass",
-                                    "Minimum Tomato Mass (g)",
-                                    min = 0,
-                                    max = 100,
-                                    value = 0 )
-                 ), # end global sidebar
+                 theme = light,
    nav_panel("Fluorescence",
+      layout_sidebar(sidebar = sidebar(
+        markdown("##### **Fluorescence Options**"),
+        sliderInput("leak_pct",
+                    "Maximum allowable leak percent - Li-600 only",
+                    min = 0,
+                    max = 100,
+                    value =10),
+        checkboxInput("outliers", "Exclude outliers", FALSE)
+      ), # end sidebar
      tabsetPanel(
        tabPanel("Distributions",
         card(card_header("Li-600", class = "bg-primary"),
@@ -293,6 +302,8 @@ ui <- navbarPage(title = "Tomato Inoculants",
                                    choices = fluoro_vars, selected = "gsw"),
                        selectInput("fluoro_col","Color Variable",
                                    choices = fluoro_vars, selected = "rh_s"),
+                       selectInput("fluoro_size","Size Variable",
+                                   choices = fluoro_vars, selected = "rh_s"),
                        sliderInput("fluoro_jit", "Jitter Amount", min=0, max=10, value =3),
                        checkboxInput("fluoro_fwrap", "Individual Plot Per Treatment", FALSE)
                      ),
@@ -306,6 +317,8 @@ ui <- navbarPage(title = "Tomato Inoculants",
                        selectInput("m_y","Y Variable",
                                    choices = m_vars, selected = "FvP_over_FmP"),
                        selectInput("m_col","Color Variable",
+                                   choices = m_vars, selected = "Ambient.Humidity"),
+                       selectInput("m_size","Size Variable",
                                    choices = m_vars, selected = "Ambient.Humidity"),
                        sliderInput("m_jit", "Jitter Amount", min=0, max=10, value =3),
                        checkboxInput("m_fwrap", "Individual Plot Per Treatment", FALSE)
@@ -335,7 +348,7 @@ ui <- navbarPage(title = "Tomato Inoculants",
                                   for pairwise comparisons between treatment groups."))
                 )
        ), # end plot tab
-       tabPanel("Statistical Tests",
+       tabPanel("Statistics",
                 card(card_header("Li-600", class = "bg-primary"),
                 card(card_header("Stomatal Conductance (gsw)", class = "bg-secondary"),
                      card_body("Based on the exploratory analysis, either a gamma or
@@ -480,37 +493,26 @@ ui <- navbarPage(title = "Tomato Inoculants",
           "))
        )
      ) # end tab set
+    ) # end sidebar layout
    ), # end fluorescence page
 
   nav_panel("Fruit",
+    layout_sidebar(
+      sidebar = sidebar(
+        markdown("##### **Fruit Options**"),
+        checkboxInput("omitna", "Exclude fruit not analyzed for sugar",
+                      FALSE),
+        checkboxInput("ber", "Exclude fruit w/ blossom end rot",
+                      FALSE),
+        sliderInput("min_mass",
+                    "Minimum Tomato Mass (g)",
+                    min = 0,
+                    max = 100,
+                    value = 0 ),
+        checkboxInput("outliers", "Exclude outliers", FALSE)
+      ), # end sidebar
     tabsetPanel(
       tabPanel("Distributions",
-        card(card_header("Sugar", class = "bg-primary"),
-             card(layout_sidebar(sidebar = sidebar(open = FALSE,
-               checkboxGroupInput("sug_dists", "Distributions",
-                choices = dists, selected = c("normal", "lognormal", "gamma"))
-            ),
-          card_body(layout_column_wrap(
-            card(card_header("Probability Density Function Plot"),
-              card_body(plotOutput("sug_pdf"))),
-            card(card_header("Cumulative Distribution Function Plot"),
-              card_body(plotOutput("sug_cdf")))
-            ))
-            )),
-          card(layout_column_wrap(
-            card(card_header("One-sample Kolmogorov-Smirnov Tests"),
-                 verbatimTextOutput("sug_mKS")
-            ),
-            card(card_header("Tests for Homogeneity of Variances"),
-                 card(card_header("Levene Test"),
-                      verbatimTextOutput("sug_levene")
-                 ),
-                 card(card_header("Bartlett Test"),
-                      verbatimTextOutput("sug_bartlett")
-                 )
-            )
-          ))
-          ),
         card(card_header("Mass", class = "bg-primary"),
              card(layout_sidebar(sidebar = sidebar(open = FALSE,
                  checkboxGroupInput("mass_dists", "Distributions",
@@ -536,6 +538,32 @@ ui <- navbarPage(title = "Tomato Inoculants",
                )
           )
         ))
+      ),
+      card(card_header("Sugar", class = "bg-primary"),
+           card(layout_sidebar(sidebar = sidebar(open = FALSE,
+             checkboxGroupInput("sug_dists", "Distributions",
+               choices = dists, selected = c("normal", "lognormal", "gamma"))
+           ),
+           card_body(layout_column_wrap(
+             card(card_header("Probability Density Function Plot"),
+                  card_body(plotOutput("sug_pdf"))),
+             card(card_header("Cumulative Distribution Function Plot"),
+                  card_body(plotOutput("sug_cdf")))
+           ))
+           )),
+           card(layout_column_wrap(
+             card(card_header("One-sample Kolmogorov-Smirnov Tests"),
+                  verbatimTextOutput("sug_mKS")
+             ),
+             card(card_header("Tests for Homogeneity of Variances"),
+                  card(card_header("Levene Test"),
+                       verbatimTextOutput("sug_levene")
+                  ),
+                  card(card_header("Bartlett Test"),
+                       verbatimTextOutput("sug_bartlett")
+                  )
+             )
+           ))
       )
     ), # end distributions tab
       tabPanel("Plots",
@@ -543,32 +571,40 @@ ui <- navbarPage(title = "Tomato Inoculants",
                                 class = "bg-primary"),
                     layout_sidebar(sidebar = sidebar(
                       selectInput("fruit_x","X Variable",
-                                  choices = fruit_vars, selected = "harvest_date"),
+                                  choices = fruit_vars, selected = "Date_analysis"),
                       selectInput("fruit_y","Y Variable",
                                   choices = fruit_vars, selected = "mass"),
                       selectInput("fruit_col","Color Variable",
+                                  choices = fruit_vars, selected = "BER"),
+                      selectInput("fruit_size","Size Variable",
                                   choices = fruit_vars, selected = "sugar_avg"),
                       sliderInput("fruit_jit", "Jitter Amount", min=0, max=10, value =3),
                       checkboxInput("fruit_fwrap", "Individual Plot Per Treatment", FALSE)
                     ),
                     card_body(plotOutput("fruit_scatter")))
                ),
-               card(card_header("Boxplots", class = "bg-secondary"),
+               card(card_header("Boxplots", class = "bg-primary"),
                     checkboxInput("fruit_box_stats", "Show Statistical Tests", FALSE),
                     selectInput("fb_labels", "Show P symbols or P values",
                                 sigcodes, "Pvalues"),
                     card_body(layout_column_wrap(
-                      card(card_header("Mass"),
+                      card(card_header("Mass", class = "bg-secondary"),
                            card_body(plotOutput("mass_box"))),
-                      card(card_header("Sugar Concentration"),
+                      card(card_header("Sugar Concentration", class = "bg-secondary"),
                            card_body(plotOutput("sug_box")))
+                    )), # end card_body
+                    card_body(layout_column_wrap(
+                      card(card_header("Mass Grouped by Plant", class = "bg-secondary"),
+                           card_body(plotOutput("massbp_box"))),
+                      card(card_header("Sugar Concentration Grouped by Plant", class = "bg-secondary"),
+                           card_body(plotOutput("sugbp_box")))
                     )), # end card_body
                     card(markdown("The above boxplots use [Kruskal-Wallis tests](https://en.wikipedia.org/wiki/Kruskal%E2%80%93Wallis_test)
                                   for the comparison of all group means and [Mann-Whitney U tests](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test)
                                   for pairwise comparisons between treatment groups."))
                ) # end sidebar layout and card
       ),
-      tabPanel("Statistical Tests",
+      tabPanel("Statistics",
                card(card_header("Mass", class = "bg-secondary"),
                 card_body(markdown("Mass stat tests blurb yabadabadebop.")),
                 card_body(layout_column_wrap(
@@ -629,7 +665,10 @@ ui <- navbarPage(title = "Tomato Inoculants",
       tabPanel("Data",
                card(card_header("Fruit Data", class = "bg-primary"),
                     DTOutput("fruit_data")
-                    )
+                    ),
+               card(card_header("Fruit Data Grouped By Plant", class = "bg-secondary"),
+                    DTOutput("fruit_databp")
+               )
       ),
       tabPanel("Info",
          card(
@@ -645,7 +684,7 @@ ui <- navbarPage(title = "Tomato Inoculants",
                       **date_analysis** is the date the fruit was analyzed in the lab (August 2024:October 2024) <br>
                       **d_diff** is the number of days from harvest to analysis. (0:6)
                       ### Response Variables <br>
-                      **mass** is the mass in grams of the tomato, measured on an *SCALE NAME*. (~50:~400) <br>
+                      **mass** is the mass in grams of the tomato, measured on an Ohaus Scout. (~10:~400) <br>
                       **BER** corresponds to whether or not the tomato has blossom end rot, a disease caused by calcium deficiency that renders the fruit unmarketable. (0,1) <br>
                       **fungus** corresponds to whether or not the tomato has fungus growing on it. This is common on fruit with BER. (0,1) <br>
                       **cracking** corresponds to whether or not the tomato has cracks in its skin (0,1) <br>
@@ -655,15 +694,127 @@ ui <- navbarPage(title = "Tomato Inoculants",
                       **sugar_avg** is the average of the two sugar measurements. <br>")))
                ) # end info panel
     ) # end tab set
+    ) # end sidebar layout
   ), # end fruit page
   nav_panel("Harvest",
-  ),
+    layout_sidebar(
+      sidebar = sidebar(
+        numericInput("nbins", "Number of Mass Bins", 10),
+      selectInput("h_var", "Distribution Variable", choices = hvars,
+                  selected = "fruit_sum"
+      )
+      ),
+      tabsetPanel(
+        tabPanel(title = "Distributions",
+                 card(card_header("Harvest by Plant", class = "bg-primary"),
+                      card(layout_sidebar(sidebar = sidebar(open = FALSE,
+                        checkboxGroupInput("hbp_dists", "Distributions",
+                           choices = dists, selected = c("normal", "lognormal", "gamma"))
+                      ),
+                      card_body(layout_column_wrap(
+                        card(card_header("Probability Density Function Plot"),
+                             card_body(plotOutput("hbp_pdf"))),
+                        card(card_header("Cumulative Distribution Function Plot"),
+                             card_body(plotOutput("hbp_cdf")))
+                      ))
+                      )),
+                      card_body(layout_column_wrap(
+                        card(card_header("One-sample Kolmogorov-Smirnov Tests"),
+                             verbatimTextOutput("hbp_mKS")
+                        ),
+                        card(card_header("Tests for Homogeneity of Variances"),
+                             card(card_header("Levene Test"),
+                                  verbatimTextOutput("hbp_levene")
+                             ),
+                             card(card_header("Bartlett Test"),
+                                  verbatimTextOutput("hbp_bartlett")
+                             )
+                        )
+                      ))
+                 ), # end HBP card
+                 card(card_header("Harvest by Mass Bin", class = "bg-primary"),
+                      card(layout_sidebar(sidebar = sidebar(open = FALSE,
+                        checkboxGroupInput("hmb_dists", "Distributions",
+                                           choices = dists, selected = c("normal", "lognormal", "gamma"))
+                      ),
+                      card_body(layout_column_wrap(
+                        card(card_header("Probability Density Function Plot"),
+                             card_body(plotOutput("hmb_pdf"))),
+                        card(card_header("Cumulative Distribution Function Plot"),
+                             card_body(plotOutput("hmb_cdf")))
+                      ))
+                      )),
+                      card_body(layout_column_wrap(
+                        card(card_header("One-sample Kolmogorov-Smirnov Tests"),
+                             verbatimTextOutput("hmb_mKS")
+                        ),
+                        card(card_header("Tests for Homogeneity of Variances"),
+                             card(card_header("Levene Test"),
+                                  verbatimTextOutput("hmb_levene")
+                             ),
+                             card(card_header("Bartlett Test"),
+                                  verbatimTextOutput("hmb_bartlett")
+                             )
+                        )
+                      ))
+                 ) # end HBP card
+                 ),
+        tabPanel(title = "Plots",
+         card(card_header("Harvest by Plant Bar Plot",
+                          class = "bg-primary"),
+          layout_sidebar(sidebar = sidebar(
+            selectInput("hbp_y","Y Variable",
+                        choices = hvars, selected = "mass"),
+            selectInput("hbp_col","Color Variable",
+                        choices = hvars, selected = "BER"),
+            checkboxInput("hbp_fwrap", "Individual Plot Per Treatment", FALSE)
+          ),
+          card_body(plotOutput("hbp_col")))
+         ),
+         card(card_header("Harvest by Mass Bin Bar Plot",
+                          class = "bg-primary"),
+              layout_sidebar(sidebar = sidebar(
+                selectInput("hmb_y","Y Variable",
+                            choices = hvars, selected = "mass"),
+                selectInput("hmb_col","Color Variable",
+                            choices = hvars, selected = "BER"),
+                checkboxInput("hmb_fwrap", "Individual Plot Per Treatment", FALSE)
+              ),
+              card_body(plotOutput("hmb_col")))
+         ),
+        ),
+        tabPanel(title = "Statistics",
+        ),
+        tabPanel(title = "Data",
+          card(card_header("Harvest Data", class = "bg-primary"),
+               DTOutput("fl_sums")
+          ),
+          card(card_header("Harvest Data By Plant", class = "bg-primary"),
+               DTOutput("fl_sums_bp")
+          ),
+          card(card_header("Harvest Data by Mass Bin", class = "bg-primary"),
+               DTOutput("fl_mb")
+          )
+        ),
+        tabPanel(title = "Info",
+        ),
+      ) # end tabset
+    ) # end sidebar layout
+  ), # end navpanel
   nav_spacer(),
-  nav_item(tags$a("Github", href = "https://github.com/zachpeagler/Portfolio/tree/main/R%20Shiny%20Apps/01%20Tomato%20Inoculants"))
+  nav_item(
+    gear
+  ),
+  nav_item(link_github)
 ) # end ui
 
 ##### server #####
-server <- function(input, output) {
+server <- function(input, output, session) {
+# theme observer
+observe(session$setCurrentTheme(
+    if (isTRUE(input$dark_mode)) dark else light
+))
+
 # Reactive Values
 ## (it would be better to use actual ReactiveValues objects, but it's far enough
 ## along in the projec that I'm just going to keep doing it this way)
@@ -696,8 +847,12 @@ server <- function(input, output) {
   Rfruit_fwrap <- reactive({input$fruit_fwrap})
   Rfruit_box_stats <- reactive({input$fruit_box_stats})
   Rfb_labels <- reactive({input$fb_labels})
-  
+  Rnbins <- reactive({input$nbins})
+  Rhbp_dists <- reactive({input$hbp_dists})
+  Rhmb_dists <- reactive({input$hmb_dists})
+  Rh_var <- reactive({input$h_var})
 ## Reactive dataframes
+### Li-600 data
   RLi_data <- reactive({
     x <- Li_data
     if (input$outliers == TRUE) {
@@ -709,6 +864,7 @@ server <- function(input, output) {
     x <- x %>% filter(leak_pct < Rleak_pct())
     return(x)
   })
+### Multispeq data
   Rm_data <- reactive({
     x <- m_data
     if (input$outliers == TRUE) {
@@ -717,6 +873,7 @@ server <- function(input, output) {
     }
     return(x)
   })
+### Fruit data
   RFl_data <- reactive({
     f <- Fl_data
     if (input$outliers == TRUE) {
@@ -732,6 +889,50 @@ server <- function(input, output) {
       f <- na.omit(f)
     }
     f <- subset(f, mass > input$min_mass)
+    return(f)
+  })
+# fruit data by plant
+  RFlbp_data <- reactive({
+    f <- na.omit(RFl_data()) %>%
+      group_by(Treatment, plant_fac) %>%
+      summarise_at(vars(mass, sugar_avg), list(mean=mean, sd=sd))
+    return(f)
+  })
+# fruit data summary
+  RFl_summary <- reactive({
+    f <- RFl_data() %>%
+      group_by(Treatment) %>%
+      summarise_at(vars(fruit, mass, BER, fungus, cracking, mass),
+                   list(sum=sum)) %>%
+      mutate(pBER = round(BER_sum/fruit_sum, 4),
+             pfungus = round(fungus_sum/fruit_sum, 4),
+             pcracking = round(cracking_sum/fruit_sum, 4)
+      )
+    return(f)
+  })
+# fruit data summary by plant
+  RFlbp_summary <- reactive({
+    f <- RFl_data() %>%
+      group_by(Treatment, plant_fac) %>%
+      summarise_at(vars(fruit, mass, BER, fungus, cracking, mass),
+                   list(sum=sum)) %>%
+      mutate(pBER = round(BER_sum/fruit_sum, 4),
+             pfungus = round(fungus_sum/fruit_sum, 4),
+             pcracking = round(cracking_sum/fruit_sum, 4)
+      )
+    return(f)
+  })
+# fruit data 
+  RFl_data_mb <- reactive({
+    f <- RFl_data() %>%
+      mutate(mass_bin = cut(mass, breaks=Rnbins()))
+    f <- f %>%
+      group_by(Treatment, mass_bin) %>%
+      summarise_at(vars(fruit, mass, BER, fungus, cracking), list(sum=sum)) %>%
+      mutate(pBER = round(BER_sum/fruit_sum, 4),
+             pfungus = round(fungus_sum/fruit_sum, 4),
+             pcracking = round(cracking_sum/fruit_sum, 4)
+      )
     return(f)
   })
 ## Reactive GLMs
@@ -784,8 +985,8 @@ server <- function(input, output) {
           data = RFl_data(), family = gaussian(link = "log"))
   })
   Rmass_glm_normal <- reactive({
-    glmer(mass ~ Treatment + (1 | plant_fac),
-         data = RFl_data(), family = gaussian(link = "identity"))
+    lmer(mass ~ Treatment + (1 | plant_fac),
+         data = RFl_data())
   })
 #### Mass
   Rsug_glm_gamma <- reactive({
@@ -797,8 +998,8 @@ server <- function(input, output) {
           data = RFl_data(), family = gaussian(link = "log"))
   })
   Rsug_glm_normal <- reactive({
-    glmer(sugar_avg ~ Treatment + (1 | plant_fac),
-         data = RFl_data(), family = gaussian(link = "identity"))
+    lmer(sugar_avg ~ Treatment + (1 | plant_fac),
+         data = RFl_data())
   })
 
 ## Fluorescence
@@ -823,8 +1024,8 @@ server <- function(input, output) {
       xlab("gsw")+
       theme(
         text = element_text(size=20, family="mont"),
-        legend.position="inside",
-        legend.position.inside = c(.75,.6),
+        legend.position="bottom",
+        legend.title.position = "top",
         legend.title = element_text(size=24, family = "mont", face= "bold"),
         axis.title = element_text(size=24, family = "mont", face= "bold"),
       )
@@ -895,8 +1096,8 @@ server <- function(input, output) {
       xlab("PhiPS2")+
       theme(
         text = element_text(size=20, family="mont"),
-        legend.position="inside",
-        legend.position.inside = c(.85,.6),
+        legend.position="bottom",
+        legend.title.position = "top",
         legend.title = element_text(size=24, family = "mont", face= "bold"),
         axis.title = element_text(size=24, family = "mont", face= "bold"),
       )
@@ -914,8 +1115,8 @@ server <- function(input, output) {
       xlab("PhiPS2")+
       theme(
         text = element_text(size=20, family="mont"),
-        legend.position="inside",
-        legend.position.inside = c(.75,.4),
+        legend.position="bottom",
+        legend.title.position = "top",
         legend.title = element_text(size=24, family = "mont", face= "bold"),
         axis.title = element_text(size=24, family = "mont", face= "bold"),
       )
@@ -947,8 +1148,8 @@ server <- function(input, output) {
       xlab("PhiPS2")+
       theme(
         text = element_text(size=20, family="mont"),
-        legend.position="inside",
-        legend.position.inside = c(.85,.6),
+        legend.position="bottom",
+        legend.title.position = "top",
         legend.title = element_text(size=24, family = "mont", face= "bold"),
         axis.title = element_text(size=24, family = "mont", face= "bold"),
       )
@@ -966,8 +1167,8 @@ server <- function(input, output) {
       xlab("PhiPS2")+
       theme(
         text = element_text(size=20, family="mont"),
-        legend.position="inside",
-        legend.position.inside = c(.75,.4),
+        legend.position="bottom",
+        legend.title.position = "top",
         legend.title = element_text(size=24, family = "mont", face= "bold"),
         axis.title = element_text(size=24, family = "mont", face= "bold"),
       )
@@ -985,8 +1186,8 @@ server <- function(input, output) {
       xlab("FvP/FmP")+
       theme(
         text = element_text(size=20, family="mont"),
-        legend.position="inside",
-        legend.position.inside = c(.85,.6),
+        legend.position="bottom",
+        legend.title.position = "top",
         legend.title = element_text(size=24, family = "mont", face= "bold"),
         axis.title = element_text(size=24, family = "mont", face= "bold"),
       )
@@ -1004,8 +1205,8 @@ server <- function(input, output) {
       xlab("FvP/FmP")+
       theme(
         text = element_text(size=20, family="mont"),
-        legend.position="inside",
-        legend.position.inside = c(.75,.4),
+        legend.position="bottom",
+        legend.title.position = "top",
         legend.title = element_text(size=24, family = "mont", face= "bold"),
         axis.title = element_text(size=24, family = "mont", face= "bold"),
       )
@@ -1019,7 +1220,7 @@ server <- function(input, output) {
             geom_jitter(width=Rfluoro_jit())+
             scale_color_scico(begin=0.9, end=0, palette=Rpalette())+
             scale_x_discrete(guide=guide_axis(check.overlap=TRUE))+
-            theme_minimal()+
+            theme_bw()+
             ylab(gettext(Rfluoro_y()))+
             xlab(gettext(Rfluoro_x()))+
             theme(
@@ -1039,7 +1240,7 @@ server <- function(input, output) {
       geom_jitter(width=Rm_jit())+
       scale_color_scico(begin=0.9, end=0, palette=Rpalette())+
       scale_x_discrete(guide=guide_axis(check.overlap=TRUE))+
-      theme_minimal()+
+      theme_bw()+
       ylab(gettext(Rm_y()))+
       xlab(gettext(Rm_x()))+
       theme(
@@ -1061,7 +1262,7 @@ server <- function(input, output) {
       scale_fill_scico_d(begin=0.9, end=0, palette=Rpalette())+
       scale_color_scico_d(begin=0.9, end=0, palette=Rpalette())+
       ylab("Stomatal Conductance (mol m-2 s-1)")+
-      theme_minimal()+
+      theme_bw()+
       theme(
         legend.position="none",
         text = element_text(size=24, family="mont", lineheight=0.5),
@@ -1090,7 +1291,7 @@ server <- function(input, output) {
       scale_fill_scico_d(begin=0.9, end=0, palette=Rpalette())+
       scale_color_scico_d(begin=0.9, end=0, palette=Rpalette())+
       ylab("PhiPS2")+
-      theme_minimal()+
+      theme_bw()+
       theme(
         legend.position="none",
         text = element_text(size=24, family="mont", lineheight=0.5),
@@ -1119,7 +1320,7 @@ server <- function(input, output) {
       scale_fill_scico_d(begin=0.9, end=0, palette=Rpalette())+
       scale_color_scico_d(begin=0.9, end=0, palette=Rpalette())+
       ylab("PhiPS2")+
-      theme_minimal()+
+      theme_bw()+
       theme(
         legend.position="none",
         text = element_text(size=24, family="mont", lineheight=0.5),
@@ -1148,7 +1349,7 @@ server <- function(input, output) {
       scale_fill_scico_d(begin=0.9, end=0, palette=Rpalette())+
       scale_color_scico_d(begin=0.9, end=0, palette=Rpalette())+
       ylab("FvP/FmP")+
-      theme_minimal()+
+      theme_bw()+
       theme(
         legend.position="none",
         text = element_text(size=24, family="mont", lineheight=0.5),
@@ -1229,8 +1430,8 @@ output$mass_pdf <- renderPlot({
     xlab("Mass")+
     theme(
       text = element_text(size=20, family="mont"),
-      legend.position="inside",
-      legend.position.inside = c(.75,.6),
+      legend.position="bottom",
+      legend.title.position = "top",
       legend.title = element_text(size=24, family = "mont", face= "bold"),
       axis.title = element_text(size=24, family = "mont", face= "bold"),
     )
@@ -1248,8 +1449,8 @@ output$mass_cdf <- renderPlot({
     xlab("Mass")+
     theme(
       text = element_text(size=20, family="mont"),
-      legend.position="inside",
-      legend.position.inside = c(.75,.6),
+      legend.position="bottom",
+      legend.title.position = "top",
       legend.title = element_text(size=24, family = "mont", face= "bold"),
       axis.title = element_text(size=24, family = "mont", face= "bold"),
     )
@@ -1283,8 +1484,8 @@ output$sug_pdf <- renderPlot({
     xlab("Sugar Concentration")+
     theme(
       text = element_text(size=20, family="mont"),
-      legend.position="inside",
-      legend.position.inside = c(.75,.6),
+      legend.position="bottom",
+      legend.title.position = "top",
       legend.title = element_text(size=24, family = "mont", face= "bold"),
       axis.title = element_text(size=24, family = "mont", face= "bold"),
     )
@@ -1302,8 +1503,8 @@ output$sug_cdf <- renderPlot({
     xlab("Sugar Concentration")+
     theme(
       text = element_text(size=20, family="mont"),
-      legend.position="inside",
-      legend.position.inside = c(.75,.6),
+      legend.position="bottom",
+      legend.title.position = "top",
       legend.title = element_text(size=24, family = "mont", face= "bold"),
       axis.title = element_text(size=24, family = "mont", face= "bold"),
     )
@@ -1325,7 +1526,7 @@ output$fruit_scatter <- renderPlot({
     geom_jitter(width=Rfruit_jit())+
     scale_color_scico(begin=0.9, end=0, palette=Rpalette())+
     scale_x_discrete(guide=guide_axis(check.overlap=TRUE))+
-    theme_minimal()+
+    theme_bw()+
     ylab(gettext(Rfruit_y()))+
     xlab(gettext(Rfruit_x()))+
     theme(
@@ -1348,7 +1549,7 @@ output$mass_box <- renderPlot({
     scale_fill_scico_d(begin=0.9, end=0, palette=Rpalette())+
     scale_color_scico_d(begin=0.9, end=0, palette=Rpalette())+
     ylab("Mass (g)")+
-    theme_minimal()+
+    theme_bw()+
     theme(
       legend.position="none",
       text = element_text(size=24, family="mont", lineheight=0.5),
@@ -1378,7 +1579,7 @@ output$sug_box <- renderPlot({
     scale_fill_scico_d(begin=0.9, end=0, palette=Rpalette())+
     scale_color_scico_d(begin=0.9, end=0, palette=Rpalette())+
     ylab("Sugar Concentration (%)")+
-    theme_minimal()+
+    theme_bw()+
     theme(
       legend.position="none",
       text = element_text(size=24, family="mont", lineheight=0.5),
@@ -1399,6 +1600,65 @@ output$sug_box <- renderPlot({
   return(pbox)
 })
 
+## mass by plant boxplot
+output$massbp_box <- renderPlot({
+  pbox <- ggplot(data = RFlbp_data(), aes(x= Treatment, y = mass_mean, fill=Treatment, color=Treatment)) +
+    geom_boxplot(alpha=.5, width=0.25)+
+    geom_violin(alpha=0.5, width=1)+
+    geom_jitter( width=.2, height=0)+
+    scale_fill_scico_d(begin=0.9, end=0, palette=Rpalette())+
+    scale_color_scico_d(begin=0.9, end=0, palette=Rpalette())+
+    ylab("Mean Mass (g)")+
+    theme_bw()+
+    theme(
+      legend.position="none",
+      text = element_text(size=24, family="mont", lineheight=0.5),
+      axis.title = element_text(size=24, family = "mont", face= "bold"),
+      title = element_text(size=30, family="open", face="bold")
+    )
+  if (Rfruit_box_stats() == TRUE) {
+    if (Rfb_labels() == "Pvalues") {
+      pbox <- pbox +
+        stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Transplantation", "Germination"), c("Transplantation", "Germ+Trans"), c("Germination", "Germ+Trans")), size=8, family="mont")+
+        stat_compare_means(label.x=3, size=8,family="mont")
+    } else {
+      pbox <- pbox +
+        stat_compare_means(label = "p.signif", comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Transplantation", "Germination"), c("Transplantation", "Germ+Trans"), c("Germination", "Germ+Trans")), size=8, family="mont")+
+        stat_compare_means(label = "p.signif", label.x=3, size=8, family="mont")
+    }
+  }
+  return(pbox)
+})
+
+## sugar by plant boxplot
+output$sugbp_box <- renderPlot({
+  pbox <- ggplot(data = RFlbp_data(), aes(x= Treatment, y = sugar_avg_mean, fill=Treatment, color=Treatment)) +
+    geom_boxplot(alpha=.5, width=0.25)+
+    geom_violin(alpha=0.5, width=1)+
+    geom_jitter( width=.2, height=0)+
+    scale_fill_scico_d(begin=0.9, end=0, palette=Rpalette())+
+    scale_color_scico_d(begin=0.9, end=0, palette=Rpalette())+
+    ylab("Mean Sugar Concentration (%)")+
+    theme_bw()+
+    theme(
+      legend.position="none",
+      text = element_text(size=24, family="mont", lineheight=0.5),
+      axis.title = element_text(size=24, family = "mont", face= "bold"),
+      title = element_text(size=30, family="open", face="bold")
+    )
+  if (Rfruit_box_stats() == TRUE) {
+    if (Rfb_labels() == "Pvalues") {
+      pbox <- pbox +
+        stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Transplantation", "Germination"), c("Transplantation", "Germ+Trans"), c("Germination", "Germ+Trans")), size=8, family="mont")+
+        stat_compare_means(label.x=3, size=8,family="mont")
+    } else {
+      pbox <- pbox +
+        stat_compare_means(label = "p.signif", comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Transplantation", "Germination"), c("Transplantation", "Germ+Trans"), c("Germination", "Germ+Trans")), size=8, family="mont")+
+        stat_compare_means(label = "p.signif", label.x=3, size=8, family="mont")
+    }
+  }
+  return(pbox)
+})
 # Fruit statistial outputs
 ### Mass statistical outputs
 output$mass_glm_gamma <- renderPrint({ summary(Rmass_glm_gamma())})
@@ -1425,7 +1685,141 @@ output$sug_glm_normal_AIC <- renderText({ AIC(Rsug_glm_normal())})
 output$fruit_data <- renderDT({
   RFl_data()
 })
+output$fruit_databp <- renderDT({
+  RFlbp_data()
+})
 
+# HARVEST
+
+## Distributions
+### Harvest by plant
+output$hbp_pdf <- renderPlot({
+  v <- Rh_var()
+  x <- RFlbp_summary()[[v]]
+  ds <- Rhbp_dists()
+  p <- multiPDF_plot(x, 100, ds)+
+    labs(title="")+
+    theme_bw()+
+    scale_color_scico_d(begin=0.9, end=0, palette = gettext(Rpalette()))+
+    ylab("PDF")+
+    xlab(gettext(Rh_var()))+
+    theme(
+      text = element_text(size=20, family="mont"),
+      legend.position="bottom",
+      legend.title.position = "top",
+      legend.title = element_text(size=24, family = "mont", face= "bold"),
+      axis.title = element_text(size=24, family = "mont", face= "bold"),
+    )
+  return(p)
+})
+output$hbp_cdf <- renderPlot({
+  v <- Rh_var()
+  x <- RFlbp_summary()[[v]]
+  ds <- Rhbp_dists()
+  p <- multiCDF_plot(x, 100, ds)+
+    labs(title="")+
+    theme_bw()+
+    scale_color_scico_d(begin=0.9, end=0, palette = gettext(Rpalette()))+
+    ylab("CDF")+
+    xlab(gettext(Rh_var()))+
+    theme(
+      text = element_text(size=20, family="mont"),
+      legend.position="bottom",
+      legend.title.position = "top",
+      legend.title = element_text(size=24, family = "mont", face= "bold"),
+      axis.title = element_text(size=24, family = "mont", face= "bold"),
+    )
+  return(p)
+})
+### distribution tests
+#### KS test
+output$hbp_mKS <- renderPrint({
+  v <- Rh_var()
+  x <- RFlbp_summary()[[v]]
+  ds <- Rhbp_dists()
+  o <- multiKS_cont(x, ds)
+  return(o)
+})
+#### homoscedasticity tests
+output$hbp_levene <- renderPrint({
+  v <- Rh_var()
+  leveneTest(RFlbp_summary()[[v]]~Treatment, data=RFlbp_summary())
+})
+output$hbp_bartlett <- renderPrint({
+  v <- Rh_var()
+  bartlett.test(RFlbp_summary()[[v]]~Treatment, data=RFlbp_summary())
+})
+### harvest mass bin
+output$hmb_pdf <- renderPlot({
+  v <- Rh_var()
+  x <- RFl_data_mb()[[v]]
+  ds <- Rhmb_dists()
+  p <- multiPDF_plot(x, 100, ds)+
+    labs(title="")+
+    theme_bw()+
+    scale_color_scico_d(begin=0.9, end=0, palette = gettext(Rpalette()))+
+    ylab("PDF")+
+    xlab(gettext(Rh_var()))+
+    theme(
+      text = element_text(size=20, family="mont"),
+      legend.position="bottom",
+      legend.title.position = "top",
+      legend.title = element_text(size=24, family = "mont", face= "bold"),
+      axis.title = element_text(size=24, family = "mont", face= "bold"),
+    )
+  return(p)
+})
+output$hmb_cdf <- renderPlot({
+  v <- Rh_var()
+  x <- RFl_data_mb()[[v]]
+  ds <- Rhmb_dists()
+  p <- multiCDF_plot(x, 100, ds)+
+    labs(title="")+
+    theme_bw()+
+    scale_color_scico_d(begin=0.9, end=0, palette = gettext(Rpalette()))+
+    ylab("CDF")+
+    xlab(gettext(Rh_var()))+
+    theme(
+      text = element_text(size=20, family="mont"),
+      legend.position="bottom",
+      legend.title.position = "top",
+      legend.title = element_text(size=24, family = "mont", face= "bold"),
+      axis.title = element_text(size=24, family = "mont", face= "bold"),
+    )
+  return(p)
+})
+### distribution tests
+#### KS test
+output$hmb_mKS <- renderPrint({
+  v <- Rh_var()
+  x <- RFl_data_mb()[[v]]
+  ds <- Rhmb_dists()
+  o <- multiKS_cont(x, ds)
+  return(o)
+})
+#### homoscedasticity tests
+output$hmb_levene <- renderPrint({
+  v <- Rh_var()
+  leveneTest(RFl_data_mb()[[v]]~Treatment, data=RFl_data_mb())
+})
+output$hmb_bartlett <- renderPrint({
+  v <- Rh_var()
+  bartlett.test(RFl_data_mb()[[v]]~Treatment, data=RFl_data_mb())
+})
+## Plots
+
+## Stats
+
+## Data
+output$fl_sums <- renderDT({
+  RFl_summary()
+})
+output$fl_sums_bp <- renderDT({
+  RFlbp_summary()
+})
+output$fl_mb <- renderDT({
+  RFl_data_mb()
+})
 } # end server
 
 # run app
