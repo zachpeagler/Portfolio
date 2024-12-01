@@ -1,15 +1,20 @@
 ---
 title: "TIP24 Analysis"
 author: "Zach Peagler"
-date: "2024-09-23"
-output: html_document
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    theme: sandstone
+    toc: yes
+    toc_float:
+      collapsed: true
 ---
 # Introduction
 
 This analysis has been performed to accompany a tomato growth trial in the Hydroponic Lab at the KSU Field Station (coordinates?). The trial was conducted with the purpose of determining the effects of differing soil microbial inoculation timings on tomato plant photosynthesis and crop yield and quality. Photosynthesis metrics were taken with a Li-COR Li-600 and two PhotosynQ MultispeQ v2.0s, and include stomatal conductance 
 **(gsw)**, measured in (mol m-2 s-1), which is a measure of how well the leaf is able to conduct gas through its stomates, and the efficiency of photosystem II **(PhiPS2)**, where photosystem II is a piece of machinery in the chloroplast essential to photosynthesis and PhiPS2 is the quantum yield in light calculated from fluorescence.
 
-Sample size **(n=48)** with 4 groups, 12 replicates per group. The tomato plants were grown in a dutch bucket hydroponic system from April to October 2024. Fluorometric measurements were taken twice weekly, and fruit were harvested upong fully ripening and taken back to the lab on the KSU campus for analysis.
+Sample size **(n=48)** with 4 groups, 12 replicates per group. The tomato plants were grown in a dutch bucket hydroponic system from May to October 2024. Fluorometric measurements were taken twice weekly, and fruit were harvested upong fully ripening and taken back to the lab on the KSU campus for analysis.
 
 Fruit analysis included weighing the tomato for its **mass** in grams and visually assessing it for blossom end rot **(BER)**, a nutritional disorder caused by calcium deficiency that renders the fruit unmarketable, as well as visual checks for **fungus** and **cracking**. Fungus commonly appears on parts of the tomato with blossom end rot or cracking. From there, fruit were analyzed with a penetrometer for **ripeness**, (1-kg) where kg is mapped from 0:1, and then with Fisher Brix Refractometers for **sugar concentration** in percent sugar content of the tomato's juice.
 
@@ -19,30 +24,42 @@ Discarded fruit were then composted.
 
 # 1. Setup
 
-## 1.1 Load packages
+### 1.1 Load packages
 
 DATA WRANGLING
- - Tidyverse
+ - tidyverse
  
 STATISTICS
- - lmerTest
- - Car
+ - lme4
+ - car
  - MASS
  - rstatix
+ - pwr
  
 GRAPHING
- - Showtext
- - Scico
+ - showtext
+ - scico
  - ggpubr
- - ggridges
+
+OTHER
+ - devtools
+ - multiFitR
+ - multiFitRgg
+ - ztils
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-require(tidyverse); require(lme4); require(showtext); require(scico); require(pwr); require(car); require(ggpubr); require(rstatix); require(ggridges); require(MASS); require(devtools)
+# get packages
+require(tidyverse); require(lme4); require(showtext); require(scico); require(pwr); require(car); require(ggpubr); require(rstatix); require(MASS); require(devtools)
 
 ## secondary packages (requires devtools)
 install_github("zachpeagler/multiFitR")
 require(multiFitR)
+install_github("zachpeagler/multiFitRgg")
+require(multiFitRgg)
+
+# include "ztils"
+## change this to github version once its pushed
+source("C:/Github/ztils/R/ztils.R")
 
 ```
 
@@ -57,7 +74,7 @@ Set shape selection from ggplot's shape library.
 ```{r g_setup, include=TRUE, echo=TRUE}
 
 a_palette <- "bilbao"
-## it's a good idea to use n+1 for palettes as often the last color is white (invisible against the default background)
+# super lazy way to make n+1 palettes
 two_colors = scico(3, palette=a_palette)
 four_colors = scico(5, palette=a_palette)
 five_colors = scico(6, palette=a_palette)
@@ -65,12 +82,38 @@ true_two_col = scico(2, palette=a_palette)
 ten_col = scico(10, palette=a_palette)
 twelve_col = scico(13, palette=a_palette)
 
+# add fonts
 font_add_google("Open Sans", family = "open")
 font_add_google("Montserrat", family = "mont")
+# necessary to initialize imported fonts
 showtext_auto()
 
+# custom shapes
 four_shapes = c(15,16,17,23)
 
+```
+
+### 1.3 Experimental Constants
+```{r exp_constants}
+
+## germination date
+germdate <- "2024-05-01"
+
+## treatment order
+treatment_order <- c("Control",
+                     "Transplantation",
+                     "Germination", 
+                     "Germ+Trans")
+
+## plant factor order
+plant_order <- c("1 1", "1 2", "1 3", "1 4", "1 5", "1 6",
+                 "1 7", "1 8", "1 9", "1 10", "1 11", "1 12",
+                 "2 1", "2 2", "2 3", "2 4", "2 5", "2 6",
+                 "2 7", "2 8", "2 9", "2 10", "2 11", "2 12",
+                 "3 1", "3 2", "3 3", "3 4", "3 5", "3 6",
+                 "3 7", "3 8", "3 9", "3 10", "3 11", "3 12",
+                 "4 1", "4 2", "4 3", "4 4", "4 5", "4 6",
+                 "4 7", "4 8", "4 9", "4 10", "4 11", "4 12")
 ```
 
 # 2. Load Data
@@ -80,13 +123,11 @@ four_shapes = c(15,16,17,23)
 ## 2.1.1 Li-600 data
 Load Li-600 data from file and convert strings to factors. Then change the treatments from numbers to the names of the groups. From here, filter the data for only those readings that have a leak percent of less than 10. QUESTION: What leak percent is acceptable to filter out? Rename the Date column to Date_ref to use it as a check that we formatted dates correctly. Format date to POSIXct in month-day-year format. Create a new plant factor that corresponds to each unique plant, then re-level the Treatment for consistency across analyses. Then we make a new column that is the log of gsw.
 
-From here, outliers in the main target variables (stomatal conductance [gsw] and photosystem II efficiency [PhiPS2]) were identified. QUESTION: should I remove statistical outliers even if I assume the collection methods were not flawed.
-
 Then, new dataframes were created out of the base Li-600 dataset to look at the mean and sd of gsw and PhiPS2, grouped by 1. treatment and date and 2. plant factor.
 
 Another dataframe was created looking at mass and fruit count sums by treatment and plant.
 
-As a final note, this data has something wrong with it, as there are ~100 gsw values <0, which should be impossible. We've contacted Li-COR for clarification and hopefully there's just a correction we can apply to the data. If not, then well uhhhh...-_o.o_-
+As a final note, this data has something wrong with it, as there are ~100 gsw values <0, which should be impossible. We've contacted Li-COR for clarification and hopefully there's just a correction we can apply to the data. If not, then Li-COR has some explaining to do.
 
 ```{r Li_data, include=TRUE, echo=TRUE}
 
@@ -102,48 +143,24 @@ Li_data <- read.csv(Li_data_file, stringsAsFactors = T) %>%
   filter(leak_pct<10, gsw>0) %>%
   rename(Date_ref = Date) %>%
   mutate(Date = parse_date_time(Date_ref, orders = "mdy"),
+         Time = parse_date_time(Time, orders = "T"),
+         DaysFromGermination = as.numeric(round(difftime(Date, germdate, units = c("days")), 0)),
          plant_fac = as.factor(paste(Row, Pot)),
-         Treatment = factor(Treatment, levels=c("Control", "Germination", 
-                                                "Transplantation", "Germ+Trans")),
-         loggsw = log(gsw)
-)
-
-# Identify outliers of target variables
-
-## Get gsw and PhiPS2 quantiles and interquartile range (IQR)
-Qgsw <- quantile(Li_data$gsw, probs=c(.25, .75), na.rm=FALSE)
-Qps2 <- quantile(Li_data$PhiPS2, probs=c(.25, .75), na.rm=FALSE)
-
-## Get interquartile range
-iqr_gsw <- IQR(Li_data$gsw)
-iqr_ps2 <- IQR(Li_data$PhiPS2)
-
-## Make new dataframes without outliers
-Li_data_no_outliers <- subset(Li_data, Li_data$gsw > (Qgsw[1]-1.5*iqr_gsw) &
-                                        Li_data$gsw < (Qgsw[2]+1.5*iqr_gsw) &
-                                        Li_data$PhiPS2 > (Qps2[1]-1.5*iqr_ps2) &
-                                        Li_data$PhiPS2 < (Qps2[2]+1.5*iqr_ps2)
-                              )
-
-## Make new dataframes without extreme outliers
-Li_data_no_extremes <- subset(Li_data, Li_data$gsw > (Qgsw[1]-3.0*iqr_gsw) &
-                                        Li_data$gsw < (Qgsw[2]+3.0*iqr_gsw) &
-                                        Li_data$PhiPS2 > (Qps2[1]-3.0*iqr_ps2) &
-                                        Li_data$PhiPS2 < (Qps2[2]+3.0*iqr_ps2)
-                              )
+         Treatment = factor(Treatment, levels = treatment_order),
+         logitPS2 = logit(PhiPS2, FALSE),
+         plant_fac = factor(plant_fac, levels = plant_order)
+) %>%
+  group_by(DaysFromGermination) %>%
+  mutate(MinutesFromStart = round(difftime(Time, min(Time), units = "mins"), 4)) %>%
+  ungroup() %>%
+  mutate(
+    Time = format(Time, "%H:%M:%S")
+  )
 
 # New dataframes of Li_data mean and sd for stomatal conductance (gsw) and Photosystem II efficiency (PhiPS2), grouped by treatment and plant
-Li_data_stats <- Li_data %>%
-  group_by(Treatment) %>%
-  summarise_at(vars(gsw, PhiPS2), list(mean=mean, sd=sd))
-
 Li_data_stats_byplant <- Li_data %>%
   group_by(Treatment, plant_fac) %>%
-  summarise_at(vars(gsw, PhiPS2), list(mean=mean, sd=sd))
-
-## Print mean and sd for Li_data by treatment
-print(Li_data_stats)
-#print(Li_data_stats_byplant)
+  summarise_at(vars(gsw, logitPS2), list(mean=mean, sd=sd))
 
 ```
 
@@ -152,19 +169,37 @@ print(Li_data_stats)
 mq_file <- "C:/Github/Portfolio/_data/tomato_inoculants/TIP24/TIP24_Multispeq.csv"
 m_data <- read.csv(mq_file) %>%
   mutate(Treatment = case_when(
-    Row=="A"~"Control",
-    Row=="B"~"Transplantation",
-    Row=="C"~"Germination",
-    Row=="D"~"Germ+Trans",
-    TRUE~NA),
+      Row=="A"~"Control",
+      Row=="B"~"Transplantation",
+      Row=="C"~"Germination",
+      Row=="D"~"Germ+Trans",
+      TRUE~NA),
     Row_num = case_when(
-    Row=="A"~ 1,
-    Row=="B"~ 2,
-    Row=="C"~ 3,
-    Row=="D"~ 4,
-    TRUE~NA),
-     plant_fac = as.factor(paste(Row_num, Pot))
-    )
+      Row=="A"~ 1,
+      Row=="B"~ 2,
+      Row=="C"~ 3,
+      Row=="D"~ 4,
+      TRUE~NA),
+    plant_fac = as.factor(paste(Row_num, Pot)),
+    Date = as.Date(time, "%m/%d/%Y"),
+    Time = parse_date_time(time, "%m/%d/%Y %H:%M %p"),
+    DaysFromGermination = as.numeric(round(difftime(Date, germdate, units = c("days")), 0)),
+    Treatment = factor(Treatment, levels = treatment_order),
+     plant_fac = factor(plant_fac, levels = plant_order),
+    logitPS2 = logit(Phi2, FALSE),
+    logitFvPFmP = logit(FvP_over_FmP, FALSE)
+    ) %>%
+  group_by(DaysFromGermination) %>%
+  mutate(MinutesFromStart = round(difftime(Time, min(Time), units = "mins"), 4)) %>%
+  ungroup() %>%
+  mutate(
+    Time = format(Time, "%H:%M:%S")
+  )
+
+m_data_stats_byplant <- m_data %>%
+  group_by(Treatment, plant_fac) %>%
+  summarise_at(vars(logitFvPFmP, logitPS2), list(mean=mean, sd=sd))
+
 ```
 
 ## 2.2 Fruit Data
@@ -183,6 +218,7 @@ Make another pivot table to get the sum of fruit count, mass, and BER, fungus, a
 ## Load and clean TIP24 fruit data
 Fl_data_file <- "C:/Github/Portfolio/_data/tomato_inoculants/TIP24/TIP24_Fruit.csv"
 Fl_data <- read.csv(Fl_data_file, stringsAsFactors = T) %>%
+  filter(mass >0) %>%
   mutate(Treatment = case_when(
     row==1~"Control",
     row==2~"Transplantation",
@@ -194,58 +230,27 @@ Fl_data <- read.csv(Fl_data_file, stringsAsFactors = T) %>%
          date_harvest_ref = date_harvest,
          date_analysis = parse_date_time(date_analysis_ref, orders = "mdy"),
          date_harvest = parse_date_time(date_harvest_ref, orders="mdy"),
-         d_harvest = format(date_analysis, format="%d"),
-         d_analysis = format(date_harvest, format="%d"),
-         d_diff = abs(as.integer(d_analysis)-as.integer(d_harvest)),
+         DaysFromHarvestToAnalysis = as.numeric(round(difftime(date_analysis,
+                                                               date_harvest, units = c("days")), 0)),
+         DaysFromGermination = as.numeric(round(difftime(date_analysis,
+                                                         germdate, units = c("days")), 0)),
          plant_fac = as.factor(paste(row, plant)),
-         Treatment = factor(Treatment, levels=c("Control","Germination", 
-                                                "Transplantation",
-                                                "Germ+Trans")),
+         Treatment = factor(Treatment, levels = treatment_order),
+         plant_fac = factor(plant_fac, levels = plant_order),
          mass_bin = cut(mass, breaks=10),
          BER_fac = as.factor(BER),
          fungus_fac = as.factor(fungus),
-         cracking_fac = as.factor(cracking)
+         cracking_fac = as.factor(cracking),
+         ripeness = abs(1 - round(penetrometer/max(na.omit(penetrometer)), 2))
          )
 
 ## Filter to only rows where there is no BER and sugar is greater than 0
 Fl_data_no_BER <- Fl_data %>%
-  filter(BER==0 & sugar_avg > 0) %>%
-  mutate(pen_mapped = penetrometer/max(penetrometer),
-         ripeness = abs(1-pen_mapped)
-        )
-
-# Identify outliers in target variables
-
-## Get mass and sugar quantiles and interquartile range (IQR)
-Qmass <- quantile(Fl_data_no_BER$mass, probs=c(.25, .75), na.rm=FALSE)
-Qsug <- quantile(Fl_data_no_BER$sugar_avg, probs=c(.25, .75), na.rm=FALSE)
-
-## Get interquartile range
-iqr_mass <- IQR(Fl_data_no_BER$mass)
-iqr_sug <- IQR(Fl_data_no_BER$sugar_avg)
-
-## Make new dataframes without outliers
-Fl_data_no_outliers <- subset(Fl_data_no_BER, mass > (Qmass[1]-1.5*iqr_mass) &
-                                       mass < (Qmass[2]+1.5*iqr_mass) &
-                                       sugar_avg > (Qsug[1]-1.5*iqr_sug) &
-                                       sugar_avg < (Qsug[2]+1.5*iqr_sug)
-                              )
-## Make new dataframes without extremes
-Fl_data_no_extremes <- subset(Fl_data_no_BER, mass > (Qmass[1]-3.0*iqr_mass) &
-                                       mass < (Qmass[2]+3.0*iqr_mass) &
-                                       sugar_avg > (Qsug[1]-3.0*iqr_sug) &
-                                       sugar_avg < (Qsug[2]+3.0*iqr_sug)
-                              )
-# New dataframes
+  filter(BER==0 & sugar_avg > 0)
 
 ## New dataframes, filtering to only those where BER is equal to 1
 Fl_data_BER <- Fl_data %>%
   filter(BER==1)
-
-## Make summary dataframe with mean and sd of mass and sugar by treatment.
-Fl_data_means <- Fl_data_no_BER %>%
-  group_by(Treatment) %>%
-  summarise_at(vars(mass, sugar_avg), list(mean=mean, sd=sd))
 
 ## Make summary dataframe with mean and sd of mass and sugar by plant.
 Fl_means_byplant <- Fl_data_no_BER %>%
@@ -262,335 +267,160 @@ Fl_data_summary <- Fl_data %>%
          pcracking = round(cracking_sum/fruit_sum, 4)
          )
 
-Fl_data_summary_date <- Fl_data %>%
-  group_by(Treatment, date_analysis) %>%
-  summarise_at(vars(fruit, mass, BER, fungus, cracking, mass), 
-               list(sum=sum)) %>%
-  mutate(pBER = round(BER_sum/fruit_sum, 4),
-         pfungus = round(fungus_sum/fruit_sum, 4),
-         pcracking = round(cracking_sum/fruit_sum, 4)
-         )
-
-
 ## Sum the fruit, BER, fungus, and cracking by mass bin, then get probs of each factor.
 Fl_data_mb <- Fl_data %>%
   group_by(Treatment, mass_bin) %>%
     summarise_at(vars(fruit, mass, BER, fungus, cracking), list(sum=sum)) %>%
-  mutate(pBER = round(BER_sum/fruit_sum, 4)*100,
-         pfungus = round(fungus_sum/fruit_sum, 4)*100,
-         pcracking = round(cracking_sum/fruit_sum, 4)*100
+  mutate(pBER = round(BER_sum/fruit_sum, 4),
+         pfungus = round(fungus_sum/fruit_sum, 4),
+         pcracking = round(cracking_sum/fruit_sum, 4)
          )
 
 ## Sum the fruit, BER, fungus, and cracking by plant, then get probs of each factor.
 Fl_sum_byplant <- Fl_data %>%
   group_by(Treatment, plant) %>%
     summarise_at(vars(fruit, mass, BER, fungus, cracking), list(sum=sum)) %>%
-  mutate(pBER = round(BER_sum/fruit_sum, 4)*100,
-         pfungus = round(fungus_sum/fruit_sum, 4)*100,
-         pcracking = round(cracking_sum/fruit_sum, 4)*100
+  mutate(pBER = round(BER_sum/fruit_sum, 4),
+         pfungus = round(fungus_sum/fruit_sum, 4),
+         pcracking = round(cracking_sum/fruit_sum, 4)
          )
 
-## Print fruit data means
-print(Fl_data_means)
-## Print fruit data means by plant
-#print(Fl_means_byplant)
-## Print fruit summary
-print(Fl_data_summary)
-## Print fruit summary by mass bin
-print(Fl_data_mb)
-## Print fruit summary by plant
-#print(Fl_sum_byplant)
+Fl_sum_means <- Fl_sum_byplant %>%
+  group_by(Treatment) %>%
+  summarise_at(vars(fruit_sum, mass_sum, pBER), list(mean=mean, sd=sd))
+
+Fl_means <- Fl_data %>%
+  group_by(Treatment) %>%
+  summarise_at(vars(mass), list(mean=mean, sd=sd))
 ```
 
 # 3. Analyses
 
 ## 3.1 Photosynthesis Analysis
 
-### 3.1.1 Exploratory Li-600 Analysis
+### 3.1.1 Stomatal Conductance (GSW) exploratory
 
-QUESTION: How do I change the xlim when x is a non-numeric factor.
-
-```{r Li_exploratory, include=TRUE, echo=TRUE}
-
-# check for normality
-shapiro.test(Li_data$PhiPS2)
-shapiro.test(Li_data$gsw)
-
-## gsw distributions
-gsw_n <- fitdistr(Li_data$gsw, "normal")
-gsw_ln <- fitdistr(Li_data$gsw, "lognormal")
-gsw_g <- fitdistr(Li_data$gsw, "gamma")
-gsw_exp <- fitdistr(Li_data$gsw, "exponential")
-gsw_seq <- seq(min(Li_data$gsw), max(Li_data$gsw), by=0.001)
-## PDFs
-gsw_pdf_n <- dnorm(gsw_seq, mean=gsw_n$estimate[1],
-                   sd=gsw_n$estimate[2])
-gsw_pdf_ln <- dlnorm(gsw_seq, meanlog=gsw_ln$estimate[1],
-                   sdlog=gsw_ln$estimate[2])
-gsw_pdf_g <- dgamma(gsw_seq, shape=gsw_g$estimate[1],
-                   rate=gsw_g$estimate[2])
-gsw_pdf_exp <- dexp(gsw_seq, rate=gsw_exp$estimate)
-gsw_pdf <- density(Li_data$gsw, n=length(gsw_pdf_ln))
-
-gsw_pdf_df <- as.data.frame(gsw_seq) %>%
-  mutate(pdf_ln = gsw_pdf_ln,
-         pdf_n = gsw_pdf_n,
-         pdf_g = gsw_pdf_g,
-         pdf_exp = gsw_pdf_exp)
-
-## CDFs
-gsw_cdf_n <- pnorm(gsw_seq, mean=gsw_n$estimate[1],
-                   sd=gsw_n$estimate[2])
-gsw_cdf_ln <- plnorm(gsw_seq, meanlog=gsw_ln$estimate[1],
-                   sdlog=gsw_ln$estimate[2])
-gsw_cdf_g <- pgamma(gsw_seq, shape=gsw_g$estimate[1],
-                   rate=gsw_g$estimate[2])
-gsw_cdf_exp <- pexp(gsw_seq, rate=gsw_exp$estimate)
-gsw_cdf <- ecdf(Li_data$gsw)(gsw_seq)
-
-gsw_cdf_df <- as.data.frame(gsw_seq) %>%
-  mutate(cdf_ln = gsw_cdf_ln,
-         cdf_n = gsw_cdf_n,
-         cdf_g = gsw_cdf_g,
-         cdf_exp = gsw_cdf_exp,
-         cdf = gsw_cdf)
-
-ggplot(gsw_pdf_df)+
-  geom_point(aes(x=gsw_seq, y=pdf_n, color="Normal"))+
-  geom_point(aes(x=gsw_seq, y=pdf_ln, color="Lognormal"))+
-  geom_point(aes(x=gsw_seq, y=pdf_g, color="Gamma"))+
-  geom_point(aes(x=gsw_seq, y=pdf_exp, color="Exponential"))+
-  geom_point(aes(x=gsw_pdf$x, y=gsw_pdf$y, color="Data"))+
-  theme_bw()+
-  scale_color_manual(values=five_colors)+
-  labs(title="PDF for gsw data and possible distributions")+
-  ylab("PDF")+
-  xlab("gsw")+
-  theme(
-    text = element_text(size=24, family="mont"),
-    legend.position="inside",
-    legend.position.inside = c(.85,.6),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold", lineheight = .5)
-  )
-
-ggplot(gsw_cdf_df)+
-  geom_point(aes(x=gsw_seq, y=cdf_n, color="Normal"))+
-  geom_point(aes(x=gsw_seq, y=cdf_ln, color="Lognormal"))+
-  geom_point(aes(x=gsw_seq, y=cdf_g, color="Gamma"))+
-  geom_point(aes(x=gsw_seq, y=cdf_exp, color="Exponential"))+
-  geom_point(aes(x=gsw_seq, y=cdf, color="Data"))+
-  theme_bw()+
-  scale_color_manual(values=five_colors)+
-  labs(title="CDF for gsw data and possible distributions")+
-  ylab("CDF")+
-  xlab("gsw")+
-  theme(
-    text = element_text(size=24, family="mont"),
-    legend.position="inside",
-    legend.position.inside = c(.85,.6),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold", lineheight = .5)
-  )
-
-### test gsw for gamma and plnorm distributions using ks test
-gsw_gks<- ks.test(Li_data$gsw, "pgamma",shape=gsw_g$estimate[1],
-                   rate=gsw_g$estimate[2])
-ks.test(Li_data$gsw, "plnorm",meanlog=gsw_ln$estimate[1],
-                   sdlog=gsw_ln$estimate[2])
-
-## PhiPS2 distribution
-PhiPS2_n <- fitdistr(Li_data$PhiPS2, "normal")
-PhiPS2_ln <- fitdistr(Li_data$PhiPS2, "lognormal")
-PhiPS2_g <- fitdistr(Li_data$PhiPS2, "gamma")
-PhiPS2_exp <- fitdistr(Li_data$PhiPS2, "exponential")
-
-PhiPS2_seq <- seq(min(Li_data$PhiPS2), max(Li_data$PhiPS2), by=0.001)
-
-## PDFs
-PhiPS2_pdf_n <- dnorm(PhiPS2_seq, mean=PhiPS2_n$estimate[1],
-                   sd=PhiPS2_n$estimate[2])
-PhiPS2_pdf_ln <- dlnorm(PhiPS2_seq, meanlog=PhiPS2_ln$estimate[1],
-                   sdlog=PhiPS2_ln$estimate[2])
-PhiPS2_pdf_g <- dgamma(PhiPS2_seq, shape=PhiPS2_g$estimate[1],
-                   rate=PhiPS2_g$estimate[2])
-PhiPS2_pdf_exp <- dexp(PhiPS2_seq, rate=PhiPS2_exp$estimate)
-PhiPS2_pdf <- density(Li_data$PhiPS2, n=length(PhiPS2_pdf_ln))
-PhiPS2_pdf_df <- as.data.frame(PhiPS2_seq) %>%
-  mutate(pdf_ln = PhiPS2_pdf_ln,
-         pdf_n = PhiPS2_pdf_n,
-         pdf_g = PhiPS2_pdf_g,
-         pdf_exp = PhiPS2_pdf_exp)
-
-## CDFs
-PhiPS2_cdf_n <- pnorm(PhiPS2_seq, mean=PhiPS2_n$estimate[1],
-                   sd=PhiPS2_n$estimate[2])
-PhiPS2_cdf_ln <- plnorm(PhiPS2_seq, meanlog=PhiPS2_ln$estimate[1],
-                   sdlog=PhiPS2_ln$estimate[2])
-PhiPS2_cdf_g <- pgamma(PhiPS2_seq, shape=PhiPS2_g$estimate[1],
-                   rate=PhiPS2_g$estimate[2])
-PhiPS2_cdf_exp <- pexp(PhiPS2_seq, rate=PhiPS2_exp$estimate)
-PhiPS2_cdf <- ecdf(Li_data$PhiPS2)(PhiPS2_seq)
-
-PhiPS2_cdf_df <- as.data.frame(PhiPS2_seq) %>%
-  mutate(cdf_ln = PhiPS2_cdf_ln,
-         cdf_n = PhiPS2_cdf_n,
-         cdf_g = PhiPS2_cdf_g,
-         cdf_exp = PhiPS2_cdf_exp,
-         cdf = PhiPS2_cdf)
-
-## PhiPS2 PDF plot
-ggplot(PhiPS2_pdf_df)+
-  geom_point(aes(x=PhiPS2_seq, y=pdf_n, color="Normal"))+
-  geom_point(aes(x=PhiPS2_seq, y=pdf_ln, color="Lognormal"))+
-  geom_point(aes(x=PhiPS2_seq, y=pdf_g, color="Gamma"))+
-  #geom_point(aes(x=PhiPS2_seq, y=pdf_exp, color="Exponential"))+
-  geom_point(aes(x=PhiPS2_pdf$x, y=PhiPS2_pdf$y, color="Data"))+
-  theme_bw()+
-  scale_color_manual(values=five_colors)+
-  guides(color=guide_legend(title="Distribution"))+
-  labs(title="PDF for PhiPS2 data and possible distributions")+
-  ylab("PDF")+
-  xlab("PhiPS2")+
-    theme(
-    text = element_text(size=24, family="mont"),
-    legend.position="inside",
-    legend.position.inside = c(.85,.6),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold", lineheight = .5)
-  )
-
-## PhiPS2 CDF plot
-ggplot(PhiPS2_cdf_df)+
-  geom_point(aes(x=PhiPS2_seq, y=cdf_n, color="Normal"))+
-  geom_point(aes(x=PhiPS2_seq, y=cdf_ln, color="Lognormal"))+
-  geom_point(aes(x=PhiPS2_seq, y=cdf_g, color="Gamma"))+
-  geom_point(aes(x=PhiPS2_seq, y=cdf, color="Data"))+
-  theme_bw()+
-  scale_color_manual(values=five_colors)+
-  guides(color=guide_legend(title="Distribution"))+
-  labs(title="CDF for PhiPS2 data and possible distributions")+
-  ylab("CDF")+
-  xlab("PhiPS2")+
-    theme(
-    text = element_text(size=24, family="mont"),
-    legend.position="inside",
-    legend.position.inside = c(.85,.6),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold", lineheight = .5)
-  )
-
-### test PhiPS2 for gamma , norm, and lnorm distributions using ks test
-ks.test(Li_data$PhiPS2, "pgamma",shape=PhiPS2_g$estimate[1],
-                   rate=PhiPS2_g$estimate[2])
-ks.test(Li_data$PhiPS2, "plnorm",meanlog=PhiPS2_ln$estimate[1],
-                   sdlog=PhiPS2_ln$estimate[2])
-ks.test(Li_data$PhiPS2, "pnorm",mean=PhiPS2_n$estimate[1],
-                   sd=PhiPS2_n$estimate[2])
+```{r gsw_exploratory}
+# PDF, CDF, and KS test
+multiPDF_Z(Li_data$gsw, 100, "all", a_palette, "gsw")
+multiCDF_Z(Li_data$gsw, 100, "all", a_palette, "gsw")
+multiKS_cont(Li_data$gsw, "all")
 
 # check for heteroscedasticity
+## in gsw as a function of treatment
 leveneTest(Li_data$gsw~Li_data$Treatment)
-leveneTest(Li_data$PhiPS2~Li_data$Treatment)
+## in gsw as a function of time from start
+leveneTest(Li_data$gsw~Li_data$MinutesFromStart)
 
-# Stomatal Conductance density by treatment
-ggplot(data=Li_data, aes(x=gsw, y = Treatment, color=Treatment, fill=Treatment))+
-  geom_density_ridges()+
+## gsw by Treatment boxplot
+ggplot(data = Li_data, aes(x= Treatment, y = gsw, fill=Treatment, color=Treatment)) +
+  geom_boxplot(alpha=.5, width=0.3, outliers = FALSE)+
+    geom_jitter( width=.15, height=0)+
+#    stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans")), size=8, family="mont")+
+#  stat_compare_means(label.x=3, label.y=3.5, size=8,family="mont")+
   scale_fill_manual(values=four_colors)+
-    scale_color_manual(values=four_colors)+
-  #xlim(-0.25, 1.5)+
-  ylab("Density")+
-  xlab("Stomatal Conductance (mol m-2 s-1)")+
-  theme_minimal()+
+  scale_color_manual(values=four_colors)+
   labs(
-    title=str_wrap("Stomatal Conductance Density for Inoculation Treatments in Tomato", 40)
-  )+
+    title=str_wrap("Stomatal Conductance Across Inoculation Treatments in Tomato", 40)
+  ) +
+  ylab("Stomatal Conductance (mol m-2 s-1)")+
+  theme_bw()+
   theme(
     legend.position="none",
-    text = element_text(size=24, family="mont", lineheight = 0.5),
-    axis.title.y = element_text(size=0),
-    axis.text = element_text(size=24, family="mont"),
+    text = element_text(size=24, family="mont", lineheight=0.5),
     axis.title = element_text(size=24, family = "mont", face= "bold"),
     title = element_text(size=30, family="open", face="bold")
   )
 
-## gsw Density Graph by plant
-ggplot(data=Li_data, aes(x=gsw, y = plant_fac, color=Treatment, fill=Treatment))+
-  geom_density_ridges()+
+# Mean GSW per plant by Treatment boxplot 
+ggplot(data = Li_data_stats_byplant, aes(x= Treatment, y = gsw_mean, fill=Treatment, color=Treatment)) +
+  geom_boxplot(alpha=.5, width=0.3, outliers = FALSE)+
+    geom_jitter( width=.15, height=0)+
+#    stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Germination", "Transplantation"), c("Germination", "Germ+Trans"), c("Transplantation", "Germ+Trans")), size=8, family="mont")+
+#  stat_compare_means(label.x=3, label.y=.8, size=8,family="mont")+
   scale_fill_manual(values=four_colors)+
-    scale_color_manual(values=four_colors)+
-  #xlim(-.025, 1.5)+
-  ylab("Density")+
-  xlab("Stomatal Conductance (mol m-2 s-1)")+
-  theme_minimal()+
+  scale_color_manual(values=four_colors)+
   labs(
-    title=str_wrap("Stomatal Conductance Density for Different Tomato Plants by Treatment", 40)
-  )+
-  theme(
-    legend.position="right",
-    text = element_text(size=24, family="mont", lineheight = 0.5),
-    axis.title.y = element_text(size=0),
-    axis.text.x = element_text(size=24, family="mont"),
-    axis.text = element_text(size=12, family="mont"),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
-  )
-
-## PhiPS2 Density Graph by treatment
-ggplot(data=Li_data, aes(x=PhiPS2, y = Treatment, color=Treatment, fill=Treatment))+
-  geom_density_ridges()+
-  scale_fill_manual(values=four_colors)+
-    scale_color_manual(values=four_colors)+
-  #xlim(.6,.8)+
-  ylab("Density")+
-  xlab("Efficiency of Photosystem II")+
-  theme_minimal()+
-  labs(
-    title=str_wrap("Photosystem II Efficiency Density for Inoculation Treatments in Tomato", 40)
-  )+
+    title=str_wrap("Mean Stomatal Conductance Per Plant
+                   Across Inoculation Treatments in Tomato", 50)
+  ) +
+  ylab("Stomatal Conductance (mol m-2 s-1)")+
+  theme_bw()+
   theme(
     legend.position="none",
-    text = element_text(size=24, family="mont", lineheight = 0.5),
-    axis.title.y = element_text(size=0),
-    axis.text = element_text(size=24, family="mont"),
+    text = element_text(size=24, family="mont", lineheight=0.5),
     axis.title = element_text(size=24, family = "mont", face= "bold"),
     title = element_text(size=30, family="open", face="bold")
   )
 
-## PhiPS2 Density Graph by plant
-ggplot(data=Li_data, aes(x=PhiPS2, y = plant_fac, color=Treatment, fill=Treatment))+
-  geom_density_ridges()+
-  scale_fill_manual(values=four_colors)+
-    scale_color_manual(values=four_colors)+
-  xlim(.6,.8)+
-  ylab("Density")+
-  xlab("Stomatal Conductance (mol m-2 s-1)")+
-  theme_minimal()+
+# GSW by date across relative humidity
+ggplot(data = Li_data, aes(x=DaysFromGermination, y = gsw, 
+                           color = rh_s)) +
+  geom_jitter(width=1, size=2, alpha=1)+
+  scale_color_scico(begin=0.9, end=0, palette=a_palette)+
+#  scale_x_discrete(guide=guide_axis(check.overlap=TRUE))+
+  theme_bw()+
+  ylab("Stomatal Conductance (mol m-2 s-1)")+
+  xlab("Days From Germination")+
   labs(
-    title=str_wrap("Photosystem II Efficiency Density for Different Tomato Plants by Treatment", 40)
+    title=str_wrap("Stomatal Conductance By Days From Germination Across Relative Humidity in Tomato", 50)
   )+
+    guides(color=guide_colorbar(title=str_wrap("Relative Humidity", 10)))+
   theme(
+    text = element_text(size=24, family="mont"),
+    legend.title = element_text(size=24, family="mont", face="bold"),
+    legend.text = element_text(size=20, family="mont"),
     legend.position="right",
-    text = element_text(size=24, family="mont", lineheight = 0.5),
-    axis.title.y = element_text(size=0),
-    axis.text.x = element_text(size=24, family="mont"),
-    axis.text = element_text(size=12, family="mont"),
+    legend.title.position = "top",
+    legend.key.height = unit(.3, "cm"),
+    legend.background = element_rect(color=two_colors[2], fill=NA,
+                                     linewidth=.5, linetype = 2),
     axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
+    title = element_text(size=30, family="open", face="bold", lineheight = .5)
   )
 
-# check for correlation between PhiPS2 and Qamb
-ggplot(data = Li_data, aes(x=Qamb, y = PhiPS2, 
+# GSW by time across relative humidity
+ggplot(data = Li_data, aes(x=Time, y = gsw, 
+                           color = Date_ref,
+                           shape = Treatment)) +
+  geom_jitter(width=1, size=2, alpha=1)+
+  scale_color_scico_d(begin=0.9, end=0, palette=a_palette)+
+  scale_shape_manual(values=four_shapes)+
+  scale_x_discrete(guide=guide_axis(check.overlap=TRUE))+
+  theme_bw()+
+  ylab("Stomatal Conductance (mol m-2 s-1)")+
+  xlab("Time")+
+  labs(
+    title=str_wrap("Stomatal Conductance By Time Across Date in Tomato", 50)
+  )+
+    guides(color=guide_legend(title="Date"))+
+  theme(
+    text = element_text(size=24, family="mont"),
+    legend.title = element_text(size=24, family="mont", face="bold"),
+    legend.text = element_text(size=20, family="mont"),
+    legend.position="right",
+    legend.title.position = "top",
+    legend.key.height = unit(.3, "cm"),
+    legend.background = element_rect(color=two_colors[2], fill=NA,
+                                     linewidth=.5, linetype = 2),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold", lineheight = .5)
+  )
+
+# gsw by relative humidity across treatment groups
+ggplot(data = Li_data, aes(x=rh_s, y = gsw, 
                            shape=Treatment, fill=Treatment, color = Treatment)) +
   geom_jitter(width=1, size=2, alpha=1)+
   scale_color_manual(values=four_colors)+
   scale_shape_manual(values=four_shapes)+
   scale_fill_manual(values=four_colors)+
-  ylim(.6,.8)+
-  theme_minimal()+
-  ylab("PhiPS2")+
-  xlab("Ambient Light")+
+  #ylim(0,1)+
+  theme_bw()+
+  ylab("Stomatal Conductance (mol m-2 s-1)")+
+  xlab("Relative Humidity")+
   labs(
-    title=str_wrap("Photosystem II Efficiency By Ambient Light Across Inoculation Treatment in Tomato", 50)
+    title=str_wrap("Stomatal Conductance By Relative
+                   Humidity Across Inoculation Treatment in Tomato", 50)
   )+
   theme(
     text = element_text(size=24, family="mont"),
@@ -598,7 +428,7 @@ ggplot(data = Li_data, aes(x=Qamb, y = PhiPS2,
     legend.text = element_text(size=20, family="mont"),
     legend.position="inside",
     legend.title.position = "top",
-    legend.position.inside=c(0.15,0.2),
+    legend.position.inside=c(0.15,0.75),
     legend.key.height = unit(.3, "cm"),
     legend.background = element_rect(color=four_colors[3], fill=NA, 
                                      linewidth=.5, linetype = 2),
@@ -606,19 +436,200 @@ ggplot(data = Li_data, aes(x=Qamb, y = PhiPS2,
     title = element_text(size=30, family="open", face="bold", lineheight = .5)
   )
 
-## Plot PhiPS2 against Qamb, facet wrapped by treatment and colored by Temperature. Because Qamb and Temperature are almost certainly correlated, this may not be very useful.
-ggplot(data = Li_data, aes(x=Qamb, y = PhiPS2, color = Tleaf)) +
-  geom_jitter(width=1, size=2, alpha=1)+
+# gsw by Minutes from Start
+ggplot(data = Li_data, aes(x=MinutesFromStart, y = gsw, color = rh_s)) +
+  geom_point()+
   scale_color_scico(begin=0.9, end=0, palette=a_palette)+
   facet_wrap(~Treatment)+
-  ylim(.6,.8)+
-  theme_minimal()+
-  ylab("PhiPS2")+
-  xlab("Ambient Light")+
+  theme_bw()+
+  ylab("Stomatal Conductance (mol m-2 s-1)")+
+  xlab("Minutes From Start")+
   labs(
-    title=str_wrap("Photosystem II Efficiency By Ambient Light Across Temperature By Inoculation Treatment in Tomato", 50)
+    title=str_wrap("Stomatal Conductance by Minutes From Start Across Inoculation Treatment in Tomato", 50)
   )+
-      guides(color=guide_colorbar(title=str_wrap("Leaf Temp (C)", 8)))+
+      guides(color=guide_colorbar(title=str_wrap("Relative Humidity", 8)))+
+  theme(
+    text = element_text(size=24, family="mont"),
+    legend.position="right",
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold", lineheight = .5)
+  )
+```
+
+### 3.1.3 Stomatal Conductance (GSW) Analysis
+
+Do a generalized linear mixed model with stomatal conductance (gsw) as response, Treatment as predictor, and days from germination as a fixed effect that should incorporate fluctuations in environmental variables, such as relative humidity, with a gamma family, log link function because gsw best fits a gamma distribution.
+
+```{r gsw_analysis, include=TRUE, echo=TRUE}
+
+#GLMM with Treatment as explanatory and days from germination as fixed effect
+gsw_glmm_dfg_summary <- summary(gsw_glm_dfg <- (glm(gsw ~ Treatment + DaysFromGermination, 
+                  data=Li_data, family=Gamma(link="log"))))
+print(gsw_glmm_dfg_summary)
+
+#GLMM with Treatment as explanatory and relative humidity as fixed effect
+gsw_glmm_rhs_summary <- summary(gsw_glm_rhs <- (glm(gsw ~ Treatment + rh_s, 
+                  data=Li_data, family=Gamma(link="log"))))
+print(gsw_glmm_rhs_summary)
+
+# pseudo R2 of glmms
+gsw_glmm_dfg_pseudoR2 <- (gsw_glmm_dfg_summary$null.deviance -
+                        gsw_glmm_dfg_summary$deviance)/gsw_glmm_dfg_summary$null.deviance
+print(gsw_glmm_dfg_pseudoR2)
+gsw_glmm_rhs_pseudoR2 <- (gsw_glmm_rhs_summary$null.deviance -
+                        gsw_glmm_rhs_summary$deviance)/gsw_glmm_rhs_summary$null.deviance
+print(gsw_glmm_rhs_pseudoR2)
+
+# PREDICTIONS
+  ## im going to do this in maybe the worst possible way, sorry
+
+# GSW_RHS
+## initialize prediction plot
+p <- ggplot()+
+  geom_point(data=Li_data, aes(x=rh_s, y=gsw, color=Treatment, shape=Treatment),
+             alpha = 0.8)
+
+## base GLM
+gsw_rhs <- (glm(gsw ~ rh_s, 
+                data=Li_data, 
+                family=Gamma(link="log")))
+## sequence
+rh_s <- seq(min(Li_data$rh_s), max(Li_data$rh_s), length=200)
+
+# loop over treatments
+for (x in treatment_order) {
+ ## treatment specific GLM
+  gsw_rhs <- (glm(gsw ~ rh_s, 
+                data=Li_data %>% filter(Treatment == x), #treatmnent == x
+                family=Gamma(link="log")))
+  ## calculate predictions
+  prx <- as.data.frame(x=rh_s)
+  pred <- predict(gsw_rhs, newdata=prx, se.fit=TRUE, type="link")
+  prx$lo <- exp(qnorm(0.025, pred$fit, pred$se.fit))
+  prx$mn <- exp(qnorm(0.5, pred$fit, pred$se.fit))
+  prx$up <- exp(qnorm(0.975, pred$fit, pred$se.fit))
+  prx$Treatment <- x
+  prx$Treatment <- factor(prx$Treatment, levels = treatment_order)
+  ## add predicted points
+  p <- p + 
+  geom_line(data=prx, aes(x=rh_s, y=lo, color = Treatment), linewidth=1, show.legend=FALSE)+
+  geom_line(data=prx, aes(x=rh_s, y=mn, color = Treatment), linewidth=2, show.legend=FALSE)+
+  geom_line(data=prx, aes(x=rh_s, y=up, color = Treatment), linewidth=1, show.legend=FALSE)+
+  geom_ribbon(data=prx, aes(x=rh_s, ymin=lo, ymax=up, fill=Treatment), alpha = 0.5)
+}
+p <- p +
+  scale_color_scico_d(begin=0.9, end=0, palette=a_palette)+
+  scale_fill_scico_d(begin=0.9, end=0, palette=a_palette)+
+  facet_wrap(~Treatment)+
+  labs(title = "Real vs Predicted for gsw_rhs glm")+
+  ylab("Stomatal Conductance (mol+1 m-2 s-1)")+
+  xlab("Relative Humidity (%)")+
+  theme_minimal()+
+  theme(
+    text = element_text(size=24, family="mont"),
+    legend.position="none",
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold", lineheight = .5)
+  )
+
+print(p)
+
+# GSW_DFG
+
+## initialize prediction plot
+p <- ggplot()+
+  geom_point(data=Li_data, aes(x=DaysFromGermination, y=gsw, color=Treatment, shape=Treatment),
+             alpha = 0.8)
+
+## base GLM
+gsw_dfg <- (glm(gsw ~ DaysFromGermination, 
+                data=Li_data, 
+                family=Gamma(link="log")))
+## sequence
+DaysFromGermination <- seq(min(Li_data$DaysFromGermination), max(Li_data$DaysFromGermination), length=200)
+
+# loop over treatments
+for (x in treatment_order) {
+ ## treatment specific GLM
+  glm_x <- (glm(gsw ~ DaysFromGermination, 
+                data=Li_data %>% filter(Treatment == x), #treatmnent == x
+                family=Gamma(link="log")))
+  ## calculate predictions
+  prx <- as.data.frame(x=DaysFromGermination)
+  pred <- predict(glm_x, newdata=prx, se.fit=TRUE, type="link")
+  prx$lo <- exp(qnorm(0.025, pred$fit, pred$se.fit))
+  prx$mn <- exp(qnorm(0.5, pred$fit, pred$se.fit))
+  prx$up <- exp(qnorm(0.975, pred$fit, pred$se.fit))
+  prx$Treatment <- x
+  prx$Treatment <- factor(prx$Treatment, levels = treatment_order)
+  ## add predicted points
+  p <- p + 
+  geom_line(data=prx, aes(x=DaysFromGermination, y=lo, color = Treatment), linewidth=1, show.legend=FALSE)+
+  geom_line(data=prx, aes(x=DaysFromGermination, y=mn, color = Treatment), linewidth=2, show.legend=FALSE)+
+  geom_line(data=prx, aes(x=DaysFromGermination, y=up, color = Treatment), linewidth=1, show.legend=FALSE)+
+  geom_ribbon(data=prx, aes(x=DaysFromGermination, ymin=lo, ymax=up, fill=Treatment), alpha = 0.5)
+}
+p <- p +
+  scale_color_scico_d(begin=0.9, end=0, palette=a_palette)+
+  scale_fill_scico_d(begin=0.9, end=0, palette=a_palette)+
+  facet_wrap(~Treatment)+
+  labs(title = "Real vs Predicted for gsw_dfg glm")+
+  ylab("Stomatal Conductance (mol+1 m-2 s-1)")+
+  xlab("Days From Germination")+
+  theme_minimal()+
+  theme(
+    text = element_text(size=24, family="mont"),
+    legend.position="none",
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold", lineheight = .5)
+  )
+
+print(p)
+
+```
+
+### 3.1.3 PhiPS2 exploratory
+
+```{r PhiPS2_exploratory}
+# Li-600
+## PDF and CDF plots
+multiPDF_Z(subset(Li_data$logitPS2, Li_data$logitPS2>0), 100, "all", a_palette, "Logit PhiPS2")
+multiCDF_Z(subset(Li_data$logitPS2, Li_data$logitPS2>0), 100, "all", a_palette, "Logit PhiPS2")
+## multi KS tests
+multiKS_cont(subset(Li_data$logitPS2, Li_data$logitPS2>0), "all")
+## test for heteroscedasticity
+leveneTest(Li_data$logitPS2~Li_data$Treatment)
+leveneTest(Li_data$logitPS2~Li_data$MinutesFromStart)
+
+# Li PhiPS2 by Days From Germination, colored by treatment
+ggplot(data = Li_data, aes(x=DaysFromGermination, y = PhiPS2, color = Treatment)) +
+  geom_jitter(width=1, size=2, alpha=1)+
+  scale_color_scico_d(begin=0.9, end=0, palette=a_palette)+
+  ylim(.6,.8)+
+  theme_bw()+
+  ylab("PhiPS2")+
+  xlab("Days From Germination")+
+  labs(
+    title=str_wrap("Li-600 Photosystem II Efficiency by Date Across Inoculation Treatment in Tomato", 50)
+  )+
+      guides(color=guide_legend(title=str_wrap("Treatment", 8)))+
+  theme(
+    text = element_text(size=24, family="mont"),
+    legend.position="right",
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold", lineheight = .5)
+  )
+# PhiPS2 by Minutes from Start colored by treatment
+ggplot(data = Li_data, aes(x=MinutesFromStart, y = PhiPS2, color = Treatment)) +
+  geom_point()+
+  scale_color_scico_d(begin=0.9, end=0, palette=a_palette)+
+  theme_bw()+
+  ylab("PhiPS2")+
+  xlab("Minutes From Start")+
+  labs(
+    title=str_wrap("Li-600 Photosystem II Efficiency by Minutes From Start Across Inoculation Treatment in Tomato", 50)
+  )+
+      guides(color=guide_legend(title=str_wrap("Treatment", 8)))+
   theme(
     text = element_text(size=24, family="mont"),
     legend.position="right",
@@ -626,56 +637,71 @@ ggplot(data = Li_data, aes(x=Qamb, y = PhiPS2, color = Tleaf)) +
     title = element_text(size=30, family="open", face="bold", lineheight = .5)
   )
 
-```
 
-### 3.1.2 Exploratory MultispeQ Analysis
-```{r m_exploratory}
-
-multiPDF_plot(m_data$Phi2, 100, c('normal','lognormal','gamma'))
-multiCDF_plot(m_data$Phi2, 100, c('normal','lognormal','gamma'))
-mPhi2_ks <- multiKS_cont(m_data$Phi2, c('normal','lognormal','gamma'))
-
-multiPDF_plot(m_data$FvP_over_FmP, 100, c('normal','lognormal','gamma', 'cauchy', 'weibull'))
-multiCDF_plot(m_data$FvP_over_FmP, 100, c('normal','lognormal','gamma', 'cauchy', 'weibull'))
-FvPFmP_ks <- multiKS_cont(m_data$FvP_over_FmP, c('normal','lognormal','gamma', 'cauchy', 'weibull'))
-
-# check for heteroscedasticity
-leveneTest(m_data$Phi2~m_data$Treatment)
-leveneTest(log(m_data$Phi2)~m_data$Treatment)
-leveneTest(m_data$FvP_over_FmP~m_data$Treatment)
-
-## PhiPS2 Density Graph by plant
-ggplot(data=m_data, aes(x=Phi2, y = plant_fac, color=Treatment, fill=Treatment))+
-  geom_density_ridges()+
+## logitPS2 by Treatment boxplot
+ggplot(data = Li_data, aes(x= Treatment, y = logitPS2, fill=Treatment, color=Treatment)) +
+  geom_boxplot(alpha=.5, width=0.3, outliers = FALSE)+
+    geom_jitter( width=.05, height=0)+
+#    stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans")), size=8, family="mont")+
+#  stat_compare_means(label.x=3, label.y=3.5, size=8,family="mont")+
   scale_fill_manual(values=four_colors)+
-    scale_color_manual(values=four_colors)+
-  ylab("Density")+
-  xlab("Stomatal Conductance (mol m-2 s-1)")+
-  theme_minimal()+
+  scale_color_manual(values=four_colors)+
   labs(
-    title=str_wrap("Photosystem II Efficiency Density for Different Tomato Plants by Treatment", 40)
-  )+
+    title=str_wrap("Li-600 LogitPS2 Across Inoculation Treatments in Tomato", 40)
+  ) +
+  ylab("Logit PhiPS2")+
+  theme_bw()+
   theme(
-    legend.position="right",
-    text = element_text(size=24, family="mont", lineheight = 0.5),
-    axis.title.y = element_text(size=0),
-    axis.text.x = element_text(size=24, family="mont"),
-    axis.text = element_text(size=12, family="mont"),
+    legend.position="none",
+    text = element_text(size=24, family="mont", lineheight=0.5),
     axis.title = element_text(size=24, family = "mont", face= "bold"),
     title = element_text(size=30, family="open", face="bold")
   )
 
-ggplot(data = m_data, aes(x=Light.Intensity..PAR., y = Phi2, 
+# Mean logitPS2 per plant by Treatment boxplot 
+ggplot(data = Li_data_stats_byplant, aes(x= Treatment, y = logitPS2_mean, fill=Treatment, color=Treatment)) +
+  geom_boxplot(alpha=.5, width=0.3, outliers = FALSE)+
+    geom_jitter( width=.15, height=0)+
+#    stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Germination", "Transplantation"), c("Germination", "Germ+Trans"), c("Transplantation", "Germ+Trans")), size=8, family="mont")+
+#  stat_compare_means(label.x=3, label.y=.8, size=8,family="mont")+
+  scale_fill_manual(values=four_colors)+
+  scale_color_manual(values=four_colors)+
+  labs(
+    title=str_wrap("Li-600 Mean Logit PhiPS2 Per Plant
+                   Across Inoculation Treatments in Tomato", 60)
+  ) +
+  ylab("Logit PhiPS2")+
+  theme_bw()+
+  theme(
+    legend.position="none",
+    text = element_text(size=24, family="mont", lineheight=0.5),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+# MultispeQ
+## PDF, CDF, and KS test
+multiPDF_Z(subset(m_data$logitPS2, m_data$logitPS2>0),
+              100, c('normal','lognormal','gamma'), a_palette, "Logit PhiPS2")
+multiCDF_Z(subset(m_data$logitPS2, m_data$logitPS2>0),
+              100, c('normal','lognormal','gamma'), a_palette, "Logit PhiPS2")
+multiKS_cont(subset(m_data$logitPS2, m_data$logitPS2>0),
+             c('normal','lognormal','gamma'))
+
+# check for heteroscedasticity
+leveneTest(m_data$logitPS2~m_data$Treatment)
+
+ggplot(data = m_data, aes(x=DaysFromGermination, y = logitPS2, 
                            shape=Treatment, fill=Treatment, color = Treatment)) +
   geom_jitter(width=1, size=2, alpha=1)+
   scale_color_manual(values=four_colors)+
   scale_shape_manual(values=four_shapes)+
   scale_fill_manual(values=four_colors)+
-  theme_minimal()+
-  ylab("PhiPS2")+
-  xlab("Ambient Light")+
+  theme_bw()+
+  ylab("Logit PhiPS2")+
+  xlab("Days From Germination")+
   labs(
-    title=str_wrap("Photosystem II Efficiency By Ambient Light Across
+    title=str_wrap("MultispeQ Logit Photosystem II Efficiency By Date Across
                    Inoculation Treatment in Tomato", 50)
   )+
   theme(
@@ -689,69 +715,23 @@ ggplot(data = m_data, aes(x=Light.Intensity..PAR., y = Phi2,
     title = element_text(size=30, family="open", face="bold", lineheight = .5)
   )
 
-```
-
-### 3.1.3 Stomatal Conductance Analysis
-
-
-Do a generalized linear mixed model with stomatal conductance (gsw) as response, Treatment as predictor, relative humidity (rh_s) as fixed effect, and plant as random effect, with an inverse link function because gsw has a gamma distribution.
-
-```{r gsw_analysis, include=TRUE, echo=TRUE}
-
-#GLMM with Treatment as explanatory
-#summary(gsw_glmm <- (glmer(gsw ~ Treatment + rh_s + (1|plant_fac), 
- #                 data=Li_data, family=Gamma(link="log"))))
-
-# GSW by date across relative humidity
-ggplot(data = Li_data, aes(x=as.factor(Date), y = gsw, 
-                           color = rh_s)) +
-  geom_jitter(width=1, size=2, alpha=1)+
-  scale_color_scico(begin=0.9, end=0, palette=a_palette)+
-  scale_x_discrete(guide=guide_axis(check.overlap=TRUE))+
-  ylim(0, 1.5)+
-  theme_minimal()+
-  ylab("Stomatal Conductance (mol m-2 s-1)")+
-  xlab("Date")+
-  labs(
-    title=str_wrap("Stomatal Conductance By Date Across Relative Humidity in Tomato", 50)
-  )+
-    guides(color=guide_colorbar(title=str_wrap("Relative Humidity", 10)))+
-  theme(
-    text = element_text(size=24, family="mont"),
-    legend.title = element_text(size=24, family="mont", face="bold"),
-    legend.text = element_text(size=20, family="mont"),
-    legend.position="inside",
-    legend.title.position = "top",
-    legend.position.inside=c(0.8,0.8),
-    legend.key.height = unit(.3, "cm"),
-    legend.background = element_rect(color=two_colors[2], fill=NA,
-                                     linewidth=.5, linetype = 2),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold", lineheight = .5)
-  )
-
-# gsw by relative humidity across treatment groups
-ggplot(data = Li_data, aes(x=rh_s, y = log(gsw), 
+ggplot(data = m_data, aes(x=MinutesFromStart, y = logitPS2, 
                            shape=Treatment, fill=Treatment, color = Treatment)) +
   geom_jitter(width=1, size=2, alpha=1)+
   scale_color_manual(values=four_colors)+
   scale_shape_manual(values=four_shapes)+
   scale_fill_manual(values=four_colors)+
-  #ylim(0,1)+
-  theme_minimal()+
-  ylab("Log of Stomatal Conductance (mol m-2 s-1)")+
-  xlab("Relative Humidity")+
+  theme_bw()+
+  ylab("Logit PhiPS2")+
+  xlab("Minutes From Start")+
   labs(
-    title=str_wrap("Log Adjusted Stomatal Conductance By Relative
-                   Humidity Across Inoculation Treatment in Tomato", 50)
+    title=str_wrap("MultispeQ Logit Photosystem II Efficiency By Minutes From Start Across
+                   Inoculation Treatment in Tomato", 50)
   )+
   theme(
     text = element_text(size=24, family="mont"),
     legend.title = element_text(size=24, family="mont", face="bold"),
     legend.text = element_text(size=20, family="mont"),
-    legend.position="inside",
-    legend.title.position = "top",
-    legend.position.inside=c(0.85,0.15),
     legend.key.height = unit(.3, "cm"),
     legend.background = element_rect(color=four_colors[3], fill=NA, 
                                      linewidth=.5, linetype = 2),
@@ -759,90 +739,45 @@ ggplot(data = Li_data, aes(x=rh_s, y = log(gsw),
     title = element_text(size=30, family="open", face="bold", lineheight = .5)
   )
 
-# The following boxplots are probably not the best way to evaluate gsw.
-
-## gsw by Treatment boxplot
-ggplot(data = Li_data, aes(x= Treatment, y = gsw, fill=Treatment, color=Treatment)) +
-  geom_boxplot(alpha=.5, width=0.25)+
-  geom_violin(alpha=0.5, width=1)+
-    geom_jitter( width=.2, height=0)+
-    stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans")), size=8, family="mont")+
-  stat_compare_means(label.x=3, label.y=3.5, size=8,family="mont")+
+## logitPS2 by Treatment boxplot
+ggplot(data = m_data, aes(x= Treatment, y = logitPS2, fill=Treatment, color=Treatment)) +
+  geom_boxplot(alpha=.5, width=0.3, outliers = FALSE)+
+    geom_jitter( width=.15, height=0)+
+#    stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans")), size=8, family="mont")+
+#  stat_compare_means(label.x=3, label.y=3.5, size=8,family="mont")+
   scale_fill_manual(values=four_colors)+
   scale_color_manual(values=four_colors)+
   labs(
-    title=str_wrap("Stomatal Conductance Across Inoculation Treatments in Tomato", 40)
+    title=str_wrap("MultispeQ LogitPS2 Across Inoculation Treatments in Tomato", 40)
   ) +
-  ylab("Stomatal Conductance (mol m-2 s-1)")+
-  theme_minimal()+
+  ylab("Logit PhiPS2")+
+  theme_bw()+
   theme(
     legend.position="none",
     text = element_text(size=24, family="mont", lineheight=0.5),
     axis.title = element_text(size=24, family = "mont", face= "bold"),
     title = element_text(size=30, family="open", face="bold")
   )
-
-## gsw by Treatment boxplot, NO OUTLIERS
-ggplot(data = Li_data_no_outliers, aes(x= Treatment, y = gsw, fill=Treatment, color=Treatment)) +
-  geom_boxplot(alpha=.5, width=0.25)+
-  geom_violin(alpha=0.5, width=1)+
-    geom_jitter( width=.2, height=0)+
-    stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans")), size=8, family="mont")+
-  stat_compare_means(label.x=3, label.y=1.5, size=8,family="mont")+
+# Mean logitPS2 per plant by Treatment boxplot 
+ggplot(data = m_data_stats_byplant, aes(x= Treatment, y = logitPS2_mean, fill=Treatment, color=Treatment)) +
+  geom_boxplot(alpha=.5, width=0.3, outliers = FALSE)+
+    geom_jitter( width=.15, height=0)+
+#    stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Germination", "Transplantation"), c("Germination", "Germ+Trans"), c("Transplantation", "Germ+Trans")), size=8, family="mont")+
+#  stat_compare_means(label.x=3, label.y=.8, size=8,family="mont")+
   scale_fill_manual(values=four_colors)+
   scale_color_manual(values=four_colors)+
   labs(
-    title=str_wrap("Stomatal Conductance Across Inoculation
-                   Treatments in Tomato No Outliers", 40)
-  ) +
-  ylab("Stomatal Conductance (mol m-2 s-1)")+
-  theme_minimal()+
-  theme(
-    legend.position="none",
-    text = element_text(size=24, family="mont", lineheight=0.5),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
-  )
-
-# Mean GSW per plant by Treatment boxplot 
-ggplot(data = Li_data_stats_byplant, aes(x= Treatment, y = gsw_mean, fill=Treatment, color=Treatment)) +
-  geom_boxplot(alpha=.5, width=0.1)+
-  geom_violin(alpha=0.5, width=1.5)+
-    geom_jitter( width=.2, height=0)+
-    stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Germination", "Transplantation"), c("Germination", "Germ+Trans"), c("Transplantation", "Germ+Trans")), size=8, family="mont")+
-  stat_compare_means(label.x=3, label.y=.8, size=8,family="mont")+
-  scale_fill_manual(values=four_colors)+
-  scale_color_manual(values=four_colors)+
-  labs(
-    title=str_wrap("Mean Stomatal Conductance Per Plant
+    title=str_wrap("MultispeQ Mean Logit PhiPS2 Per Plant
                    Across Inoculation Treatments in Tomato", 50)
   ) +
-  ylab("Stomatal Conductance (mol m-2 s-1)")+
-  theme_minimal()+
+  ylab("Mean Logit PhiPS2")+
+  theme_bw()+
   theme(
     legend.position="none",
     text = element_text(size=24, family="mont", lineheight=0.5),
     axis.title = element_text(size=24, family = "mont", face= "bold"),
     title = element_text(size=30, family="open", face="bold")
   )
-
-```
-
-
-
-### 3.1.4 PhiPS2 Analysis
-
-```{r PhiPS2_analysis, include=TRUE, echo=TRUE}
-
-# linear mixed model with PhiPS2 as response, Treatment as predictor (explanatory), light (Qamb) as fixed effect, and plant as random effect
-
-#summary(model_PhiPS2 <- (lmer(
-#  PhiPS2 ~ Treatment + Qamb + (1|plant_fac),
-#  data = Li_data)))
-
-#summary(model_PhiPS2_noT <- (lmer(
-#  PhiPS2 ~ Qamb + (1|plant_fac),
-#  data = Li_data)))
 
 ## PhiPS2 by date, grouped by treatment
 ggplot(data = Li_data, aes(x=as.factor(Date), y = PhiPS2, color = Treatment,
@@ -854,7 +789,7 @@ ggplot(data = Li_data, aes(x=as.factor(Date), y = PhiPS2, color = Treatment,
   scale_x_discrete(guide=guide_axis(check.overlap=TRUE))+
   ylim(.6,.8)+
   facet_wrap(~Treatment)+
-  theme_minimal()+
+  theme_bw()+
   ylab("PhiPS2")+
   xlab("Date")+
   labs(
@@ -874,7 +809,7 @@ ggplot(data = Li_data, aes(x=Date, y = PhiPS2, color = Tleaf)) +
   scale_color_scico(begin=0.9, end=0, palette=a_palette)+
   scale_x_discrete(guide=guide_axis(check.overlap=TRUE))+
   ylim(.6,.8)+
-  theme_minimal()+
+  theme_bw()+
   guides(color=guide_legend(title="Leaf Temp (C)"))+
   ylab("PhiPS2")+
   xlab("Date")+
@@ -895,342 +830,446 @@ ggplot(data = Li_data, aes(x=Date, y = PhiPS2, color = Tleaf)) +
     title = element_text(size=30, family="open", face="bold", lineheight = .5)
   )
 
-# The following boxplots are probably not the best way to evaluate gsw.
-
-## PhiPS2 by Treatment boxplot
-ggplot(data = Li_data, aes(x= Treatment, y = PhiPS2, fill=Treatment, color=Treatment)) +
-  geom_boxplot(alpha=.5, width=0.25)+
-  geom_violin(alpha=0.5, width=1)+
-    geom_jitter( width=.2, height=0)+
-    stat_compare_means(comparisons = list(
-      c("Control","Germination"),
-      c("Control", "Transplantation"),
-      c("Control", "Germ+Trans")),
-      size=8, family="mont")+
-  stat_compare_means(label.x=3.5, label.y=1.05, size=8,family="mont")+
-  scale_fill_manual(values=four_colors)+
-  scale_color_manual(values=four_colors)+
-  labs(
-    title=str_wrap("Efficiency of Photosystem II Across
-                   Inoculation Treatments in Tomato", 40)
-  ) +
-  ylab("PhiPS2")+
-  theme_minimal()+
-  theme(
-    legend.position="none",
-    text = element_text(size=24, family="mont", lineheight=0.5),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
-  )
-
-## PhiPS2 by Treatment boxplot NO OUTLIERS
-ggplot(data = Li_data_no_outliers, aes(x= Treatment, y = PhiPS2, fill=Treatment, color=Treatment)) +
-  geom_boxplot(alpha=.5, width=0.25)+
-  geom_violin(alpha=0.5, width=1)+
-    geom_jitter( width=.2, height=0)+
-    stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans")), size=8, family="mont")+
-  stat_compare_means(label.x=3.25, label.y=.85, size=8,family="mont")+
-  scale_fill_manual(values=four_colors)+
-  scale_color_manual(values=four_colors)+
-  labs(
-    title=str_wrap("Efficiency of Photosystem II Across
-                   Inoculation Treatments in Tomato No Outliers", 40)
-  ) +
-  ylab("PhiPS2")+
-  theme_minimal()+
-  theme(
-    legend.position="none",
-    text = element_text(size=24, family="mont", lineheight=0.5),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
-  )
-
-## Mean PhiPS2 per plant by Treatment boxplot 
-ggplot(data = Li_data_stats_byplant, aes(x= Treatment, y = PhiPS2_mean, fill=Treatment, color=Treatment)) +
-  geom_boxplot(alpha=.5, width=0.1)+
-  geom_violin(alpha=0.5, width=1)+
-    geom_jitter( width=.2, height=0)+
-    stat_compare_means(comparisons = list(
-      c("Control","Germination"),
-      c("Control", "Transplantation"),
-      c("Control", "Germ+Trans"),
-      c("Germination", "Transplantation"),
-      c("Germination", "Germ+Trans"),
-      c("Transplantation", "Germ+Trans")),
-      size=8, family="mont")+
-  stat_compare_means(label.x=.5, label.y=.8, size=8,family="mont")+
-  scale_fill_manual(values=four_colors)+
-  scale_color_manual(values=four_colors)+
-  labs(
-    title=str_wrap("Mean Photosystem II Efficiency Per Plant
-                   Across Inoculation Treatments in Tomato", 50)
-  ) +
-  ylab("PhiPS2")+
-  theme_minimal()+
-  theme(
-    legend.position="none",
-    text = element_text(size=24, family="mont", lineheight=0.5),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
-  )
+# compare Li-600 and MultispeQ - PhiPS2
+ggplot(       )
 
 ```
 
-## 3.2 Fruit Analysis
+### 3.1.4 PhiPS2 Analysis
 
-### 3.2.1 Exploratory Fruit Analysis
-```{r Fruit_exploratory, include=TRUE, echo=TRUE}
+Because we logit transformed PhiPS2, we should be able to treat it as normal.
 
-# check for normality
-## use shapiro wilk tests
-shapiro.test(Fl_data_no_BER$mass)
-shapiro.test(Fl_data_no_BER$sugar_avg)
+```{r PhiPS2_analysis, include=TRUE, echo=TRUE}
 
-## mass distribution
-mass_n <- fitdistr(Fl_data$mass, "normal")
-mass_ln <- fitdistr(Fl_data$mass, "lognormal")
-mass_g <- fitdistr(Fl_data$mass, "gamma")
+# linear mixed model with PhiPS2 as response, Treatment as predictor (explanatory), days from germination as fixed effect
 
-mass_seq <- seq(min(Fl_data$mass), max(Fl_data$mass), by=0.1)
-mass_pdf_n <- dnorm(mass_seq, mean=mass_n$estimate[1],
-                   sd=mass_n$estimate[2])
-mass_pdf_ln <- dlnorm(mass_seq, meanlog=mass_ln$estimate[1],
-                   sdlog=mass_ln$estimate[2])
-mass_pdf_g <- dgamma(mass_seq, shape=mass_g$estimate[1],
-                   rate=mass_g$estimate[2])
-mass_pdf <- density(Fl_data$mass, n=length(mass_pdf_ln))
+mod_Phi2_dfg_LI600_s <- summary(mod_Phi2_dfg_LI600 <- (lm(
+  logitPS2 ~ Treatment + DaysFromGermination,
+  data = Li_data)))
+print(mod_Phi2_dfg_LI600_s)
+## R2 0.0713
 
-mass_pdf_df <- as.data.frame(mass_seq) %>%
-  mutate(pdf_ln = mass_pdf_ln,
-         pdf_n = mass_pdf_n,
-         pdf_g = mass_pdf_g)
+mod_Phi2_qamb_LI600_s <- summary(mod_Phi2_dfg_LI600 <- (lm(
+  logitPS2 ~ Treatment + Qamb,
+  data = Li_data)))
+print(mod_Phi2_qamb_LI600_s)
+## R2 0.0218
 
-## CDFs
-mass_cdf_n <- pnorm(mass_seq, mean=mass_n$estimate[1],
-                   sd=mass_n$estimate[2])
-mass_cdf_ln <- plnorm(mass_seq, meanlog=mass_ln$estimate[1],
-                   sdlog=mass_ln$estimate[2])
-mass_cdf_g <- pgamma(mass_seq, shape=mass_g$estimate[1],
-                   rate=mass_g$estimate[2])
-mass_cdf <- ecdf(Fl_data$mass)(mass_seq)
+mod_Phi2_dfg_Mult_s <- summary(mod_Phi2_dfg_Mult <- (lm(
+  logitPS2 ~ Treatment + DaysFromGermination,
+  data = m_data)))
+print(mod_Phi2_dfg_Mult_s)
+## R2 0.0998
 
-mass_cdf_df <- as.data.frame(mass_seq) %>%
-  mutate(cdf_ln = mass_cdf_ln,
-         cdf_n = mass_cdf_n,
-         cdf_g = mass_cdf_g,
-         cdf = mass_cdf)
+mod_Phi2_qamb_Mult_s <- summary(mod_Phi2_qamb_Mult <- (lm(
+  logitPS2 ~ Treatment + Light.Intensity..PAR.,
+  data = m_data)))
+print(mod_Phi2_qamb_Mult_s)
+## R2 0.5065
 
-## Plot Mass PDF
-ggplot(mass_pdf_df)+
-  geom_point(aes(x=mass_seq, y=pdf_n, color="Normal"))+
-  geom_point(aes(x=mass_seq, y=pdf_ln, color="Lognormal"))+
-  geom_point(aes(x=mass_seq, y=pdf_g, color="Gamma"))+
-  geom_point(aes(x=mass_pdf$x, y=mass_pdf$y, color="Data"))+
-  theme_bw()+
-  scale_color_manual(values=four_colors)+
-  labs(title="PDF for mass data and possible distributions")+
-  ylab("PDF")+
-  xlab("mass")+
+
+# run and plot predictions
+
+# Li-600 logitPS2 ~ Qamb
+## initialize prediction plot
+p <- ggplot()+
+  geom_point(data=Li_data, aes(x=Qamb, y=logitPS2, color=Treatment, shape=Treatment),
+             alpha = 0.8)
+
+## base LM
+lm_x <- (lm(logitPS2 ~ Qamb, data=Li_data))
+## sequence
+Qamb <- seq(min(Li_data$Qamb), max(Li_data$Qamb), length=200)
+
+# loop over treatments
+for (x in treatment_order) {
+ ## treatment specific GLM
+  lm_x <- (lm(logitPS2 ~ Qamb, 
+                data=Li_data %>% filter(Treatment == x)))
+  ## calculate predictions
+  prx <- as.data.frame(x=Qamb)
+  pred <- predict(lm_x, newdata=prx, se.fit=TRUE, type="terms")
+  prx$lo <- exp(qnorm(0.025, pred$fit, pred$se.fit))
+  prx$mn <- exp(qnorm(0.5, pred$fit, pred$se.fit))
+  prx$up <- exp(qnorm(0.975, pred$fit, pred$se.fit))
+  prx$Treatment <- x
+  prx$Treatment <- factor(prx$Treatment, levels = treatment_order)
+  ## add predicted points
+  p <- p + 
+  geom_line(data=prx, aes(x=Qamb, y=lo, color = Treatment), linewidth=1, show.legend=FALSE)+
+  geom_line(data=prx, aes(x=Qamb, y=mn, color = Treatment), linewidth=2, show.legend=FALSE)+
+  geom_line(data=prx, aes(x=Qamb, y=up, color = Treatment), linewidth=1, show.legend=FALSE)+
+  geom_ribbon(data=prx, aes(x=Qamb, ymin=lo, ymax=up, fill=Treatment), alpha = 0.5)
+}
+p <- p +
+  scale_color_scico_d(begin=0.9, end=0, palette=a_palette)+
+  scale_fill_scico_d(begin=0.9, end=0, palette=a_palette)+
+labs(title = "Real vs Predicted for Li-600 logitPS2 ~ Treatment + Qamb")+
+  ylab("logit PhiPS2")+
+  xlab("Ambient Light (lumens)")+
+  theme_minimal()+
   theme(
     text = element_text(size=24, family="mont"),
-    legend.position="inside",
-    legend.position.inside = c(.85,.6),
+    legend.position="right",
     axis.title = element_text(size=24, family = "mont", face= "bold"),
     title = element_text(size=30, family="open", face="bold", lineheight = .5)
   )
 
-## Plot Mass CDF
-ggplot(mass_cdf_df)+
-  geom_point(aes(x=mass_seq, y=cdf_n, color="Normal"))+
-  geom_point(aes(x=mass_seq, y=cdf_ln, color="Lognormal"))+
-  geom_point(aes(x=mass_seq, y=cdf_g, color="Gamma"))+
-  geom_point(aes(x=mass_seq, y=cdf, color="Data"))+
-  theme_bw()+
-  scale_color_manual(values=four_colors)+
-  labs(title="CDF for mass data and possible distributions")+
-  ylab("CDF")+
-  xlab("mass")+
+print(p)
+
+# Li-600 logitPS2 ~ DaysFromGermination
+## initialize prediction plot
+p <- ggplot()+
+  geom_point(data=Li_data, aes(x=DaysFromGermination, y=logitPS2, color=Treatment, shape=Treatment),
+             alpha = 0.8)
+
+## base LM
+lm_x <- (lm(logitPS2 ~ DaysFromGermination, 
+                data=Li_data))
+## sequence
+DaysFromGermination <- seq(min(Li_data$DaysFromGermination), max(Li_data$DaysFromGermination), length=200)
+
+# loop over treatments
+for (x in treatment_order) {
+ ## treatment specific GLM
+  lm_x <- (lm(logitPS2 ~ DaysFromGermination, 
+                data=Li_data %>% filter(Treatment == x)))
+  ## calculate predictions
+  prx <- as.data.frame(x=DaysFromGermination)
+  pred <- predict(lm_x, newdata=prx, se.fit=TRUE, type="terms")
+  prx$lo <- exp(qnorm(0.025, pred$fit, pred$se.fit))
+  prx$mn <- exp(qnorm(0.5, pred$fit, pred$se.fit))
+  prx$up <- exp(qnorm(0.975, pred$fit, pred$se.fit))
+  prx$Treatment <- x
+  prx$Treatment <- factor(prx$Treatment, levels = treatment_order)
+  ## add predicted points
+  p <- p + 
+  geom_line(data=prx, aes(x=DaysFromGermination, y=lo, color = Treatment), linewidth=1, show.legend=FALSE)+
+  geom_line(data=prx, aes(x=DaysFromGermination, y=mn, color = Treatment), linewidth=2, show.legend=FALSE)+
+  geom_line(data=prx, aes(x=DaysFromGermination, y=up, color = Treatment), linewidth=1, show.legend=FALSE)+
+  geom_ribbon(data=prx, aes(x=DaysFromGermination, ymin=lo, ymax=up, fill=Treatment), alpha = 0.5)
+}
+p <- p +
+  scale_color_scico_d(begin=0.9, end=0, palette=a_palette)+
+  scale_fill_scico_d(begin=0.9, end=0, palette=a_palette)+
+labs(title = "Real vs Predicted for Li-600 logitPS2 ~ Treatment + DaysFromGermination")+
+  ylab("logit PhiPS2")+
+  xlab("Days From Germination")+
+  theme_minimal()+
   theme(
     text = element_text(size=24, family="mont"),
-    legend.position="inside",
-    legend.position.inside = c(.85,.6),
+    legend.position="right",
     axis.title = element_text(size=24, family = "mont", face= "bold"),
     title = element_text(size=30, family="open", face="bold", lineheight = .5)
   )
 
-### test mass for gamma and plnorm distributions using ks test
-ks.test(Fl_data$mass, "pgamma",shape=mass_g$estimate[1],
-                   rate=mass_g$estimate[2])
-ks.test(Fl_data$mass, "plnorm",meanlog=mass_ln$estimate[1],
-                   sdlog=mass_ln$estimate[2])
+print(p)
 
-## sugar_avg distribution
-sugar_avg_n <- fitdistr(Fl_data_no_BER$sugar_avg, "normal")
-sugar_avg_ln <- fitdistr(Fl_data_no_BER$sugar_avg, "lognormal")
-sugar_avg_g <- fitdistr(Fl_data_no_BER$sugar_avg, "gamma")
+# Multispeq logitPS2 ~ DaysFromGermination
+## initialize prediction plot
+p <- ggplot()+
+  geom_point(data=m_data, aes(x=DaysFromGermination, y=logitPS2, color=Treatment, shape=Treatment),
+             alpha = 0.8)
+## base GLM
+lm_x <- (lm(logitPS2 ~ DaysFromGermination, 
+                data=m_data))
+## sequence
+DaysFromGermination <- seq(min(m_data$DaysFromGermination), max(m_data$DaysFromGermination), length=200)
 
-sugar_avg_seq <- seq(min(Fl_data_no_BER$sugar_avg), max(Fl_data_no_BER$sugar_avg), by=0.01)
-
-## PDFs
-sugar_avg_pdf_n <- dnorm(sugar_avg_seq, mean=sugar_avg_n$estimate[1],
-                   sd=sugar_avg_n$estimate[2])
-sugar_avg_pdf_ln <- dlnorm(sugar_avg_seq, meanlog=sugar_avg_ln$estimate[1],
-                   sdlog=sugar_avg_ln$estimate[2])
-sugar_avg_pdf_g <- dgamma(sugar_avg_seq, shape=sugar_avg_g$estimate[1],
-                   rate=sugar_avg_g$estimate[2])
-sugar_avg_pdf <- density(Fl_data_no_BER$sugar_avg, n=length(sugar_avg_pdf_ln))
-
-sugar_avg_pdf_df <- as.data.frame(sugar_avg_seq) %>%
-  mutate(pdf_ln = sugar_avg_pdf_ln,
-         pdf_n = sugar_avg_pdf_n,
-         pdf_g = sugar_avg_pdf_g)
-
-## CDFs
-sugar_avg_cdf_n <- pnorm(sugar_avg_seq, mean=sugar_avg_n$estimate[1],
-                   sd=sugar_avg_n$estimate[2])
-sugar_avg_cdf_ln <- plnorm(sugar_avg_seq, meanlog=sugar_avg_ln$estimate[1],
-                   sdlog=sugar_avg_ln$estimate[2])
-sugar_avg_cdf_g <- pgamma(sugar_avg_seq, shape=sugar_avg_g$estimate[1],
-                   rate=sugar_avg_g$estimate[2])
-sugar_avg_cdf <- ecdf(Fl_data$sugar_avg)(sugar_avg_seq)
-
-sugar_avg_cdf_df <- as.data.frame(sugar_avg_seq) %>%
-  mutate(cdf_ln = sugar_avg_cdf_ln,
-         cdf_n = sugar_avg_cdf_n,
-         cdf_g = sugar_avg_cdf_g,
-         cdf = sugar_avg_cdf)
-
-## Plot sugar PDF
-ggplot(sugar_avg_pdf_df)+
-  geom_point(aes(x=sugar_avg_seq, y=pdf_n, color="Normal"))+
-  geom_point(aes(x=sugar_avg_seq, y=pdf_ln, color="Lognormal"))+
-  geom_point(aes(x=sugar_avg_seq, y=pdf_g, color="Gamma"))+
-  geom_point(aes(x=sugar_avg_pdf$x, y=sugar_avg_pdf$y, color="Data"))+
-  theme_bw()+
-  scale_color_manual(values=four_colors)+
-  labs(title="PDF for sugar_avg data and possible distributions")+
-  ylab("PDF")+
-  xlab("sugar_avg")+
+# loop over treatments
+for (x in treatment_order) {
+ ## treatment specific GLM
+  lm_x <- (lm(logitPS2 ~ DaysFromGermination, 
+                data=m_data %>% filter(Treatment == x))) #treatmnent == x
+  ## calculate predictions
+  prx <- as.data.frame(x=DaysFromGermination)
+  pred <- predict(lm_x, newdata=prx, se.fit=TRUE, type="terms")
+  prx$lo <- exp(qnorm(0.025, pred$fit, pred$se.fit))
+  prx$mn <- exp(qnorm(0.5, pred$fit, pred$se.fit))
+  prx$up <- exp(qnorm(0.975, pred$fit, pred$se.fit))
+  prx$Treatment <- x
+  prx$Treatment <- factor(prx$Treatment, levels = treatment_order)
+  ## add predicted points
+  p <- p + 
+  geom_line(data=prx, aes(x=DaysFromGermination, y=lo, color = Treatment), linewidth=1, show.legend=FALSE)+
+  geom_line(data=prx, aes(x=DaysFromGermination, y=mn, color = Treatment), linewidth=2, show.legend=FALSE)+
+  geom_line(data=prx, aes(x=DaysFromGermination, y=up, color = Treatment), linewidth=1, show.legend=FALSE)+
+  geom_ribbon(data=prx, aes(x=DaysFromGermination, ymin=lo, ymax=up, fill=Treatment), alpha = 0.5)
+}
+p <- p +
+  scale_color_scico_d(begin=0.9, end=0, palette=a_palette)+
+  scale_fill_scico_d(begin=0.9, end=0, palette=a_palette)+
+labs(title = "Real vs Predicted for MultispeQ logitPS2 ~ Treatment + DaysFromGermination")+
+  ylab("logit PhiPS2")+
+  xlab("Days From Germination")+
+  theme_minimal()+
   theme(
     text = element_text(size=24, family="mont"),
-    legend.position="inside",
-    legend.position.inside = c(.85,.6),
+    legend.position="right",
     axis.title = element_text(size=24, family = "mont", face= "bold"),
     title = element_text(size=30, family="open", face="bold", lineheight = .5)
   )
 
-## Plot sugar CDF
-ggplot(sugar_avg_cdf_df)+
-  geom_point(aes(x=sugar_avg_seq, y=cdf_n, color="Normal"))+
-  geom_point(aes(x=sugar_avg_seq, y=cdf_ln, color="Lognormal"))+
-  geom_point(aes(x=sugar_avg_seq, y=cdf_g, color="Gamma"))+
-  geom_point(aes(x=sugar_avg_seq, y=cdf, color="Data"))+
-  theme_bw()+
-  scale_color_manual(values=four_colors)+
-  labs(title="CDF for sugar_avg data and possible distributions")+
-  ylab("CDF")+
-  xlab("sugar_avg")+
+print(p)
+
+# Multispeq logitPS2 ~ Light.Intensity..PAR.
+## initialize prediction plot
+p <- ggplot()+
+  geom_point(data=m_data, aes(x=Light.Intensity..PAR., y=logitPS2, color=Treatment, shape=Treatment),
+             alpha = 0.8)
+## base GLM
+lm_x <- (lm(logitPS2 ~ Light.Intensity..PAR., 
+                data=m_data))
+## sequence
+Light.Intensity..PAR. <- seq(min(m_data$Light.Intensity..PAR.), max(m_data$Light.Intensity..PAR.), length=200)
+
+# loop over treatments
+for (x in treatment_order) {
+ ## treatment specific GLM
+  lm_x <- (lm(logitPS2 ~ Light.Intensity..PAR., 
+                data=m_data %>% filter(Treatment == x))) #treatmnent == x
+  ## calculate predictions
+  prx <- as.data.frame(x=Light.Intensity..PAR.)
+  pred <- predict(lm_x, newdata=prx, se.fit=TRUE, type="terms")
+  prx$lo <- exp(qnorm(0.025, pred$fit, pred$se.fit))
+  prx$mn <- exp(qnorm(0.5, pred$fit, pred$se.fit))
+  prx$up <- exp(qnorm(0.975, pred$fit, pred$se.fit))
+  prx$Treatment <- x
+  prx$Treatment <- factor(prx$Treatment, levels = treatment_order)
+  ## add predicted points
+  p <- p + 
+  geom_line(data=prx, aes(x=Light.Intensity..PAR., y=lo, color = Treatment), linewidth=1, show.legend=FALSE)+
+  geom_line(data=prx, aes(x=Light.Intensity..PAR., y=mn, color = Treatment), linewidth=2, show.legend=FALSE)+
+  geom_line(data=prx, aes(x=Light.Intensity..PAR., y=up, color = Treatment), linewidth=1, show.legend=FALSE)+
+  geom_ribbon(data=prx, aes(x=Light.Intensity..PAR., ymin=lo, ymax=up, fill=Treatment), alpha = 0.5)
+}
+p <- p +
+  scale_color_scico_d(begin=0.9, end=0, palette=a_palette)+
+  scale_fill_scico_d(begin=0.9, end=0, palette=a_palette)+
+labs(title = "Real vs Predicted for MultispeQ logitPS2 ~ Treatment + Light")+
+  ylab("logit PhiPS2")+
+  xlab("Light Intensity (PAR)")+
+  theme_minimal()+
   theme(
     text = element_text(size=24, family="mont"),
-    legend.position="inside",
-    legend.position.inside = c(.85,.6),
+    legend.position="right",
     axis.title = element_text(size=24, family = "mont", face= "bold"),
     title = element_text(size=30, family="open", face="bold", lineheight = .5)
   )
 
-### test sugar_avg for gamma and plnorm distributions using ks test
-ks.test(Fl_data_no_BER$sugar_avg, "pgamma",shape=sugar_avg_g$estimate[1],
-                   rate=sugar_avg_g$estimate[2])
-ks.test(Fl_data_no_BER$sugar_avg, "plnorm",meanlog=sugar_avg_ln$estimate[1],
-                   sdlog=sugar_avg_ln$estimate[2])
-ks.test(Fl_data_no_BER$sugar_avg, "pnorm",mean=sugar_avg_n$estimate[1],
-                   sd=sugar_avg_n$estimate[2])
+print(p)
 
-## Test for homoscedasticity
-leveneTest(Fl_data_no_BER$sugar_avg~Fl_data_no_BER$Treatment)
-leveneTest(Fl_data_no_BER$mass~Fl_data_no_BER$Treatment)
 
-# Plots
-## Density plot for mass by treatment across no BER tomatoes (exploratory)
-ggplot(data=Fl_data_no_BER, aes(x=mass, y = Treatment, color=Treatment, fill=Treatment))+
-  geom_density_ridges()+
+```
+
+### 3.1.5 FvP/FmP exploratory
+
+```{r FvPFmP_exploratory}
+multiPDF_Z(subset(m_data$logitFvPFmP, m_data$logitFvPFmP > 0),
+              100, c('normal','lognormal','gamma'), a_palette, "FvP/FmP")
+multiCDF_Z(subset(m_data$logitFvPFmP, m_data$logitFvPFmP > 0),
+              100, c('normal','lognormal','gamma'), a_palette, "FvP/FmP")
+multiKS_cont(subset(m_data$logitFvPFmP, m_data$logitFvPFmP > 0),
+             c('normal','lognormal','gamma'))
+
+leveneTest(m_data$logitFvPFmP~m_data$Treatment)
+
+
+ggplot(data = m_data, aes(x=MinutesFromStart, y = logitFvPFmP, 
+                           shape=Treatment, fill=Treatment, color = Treatment)) +
+  geom_jitter(width=1, size=2, alpha=1)+
+  scale_color_manual(values=four_colors)+
+  scale_shape_manual(values=four_shapes)+
+  scale_fill_manual(values=four_colors)+
+  facet_wrap(~Treatment)+
+  theme_bw()+
+  ylab("Logit FvP/FmP")+
+  xlab("Minutes From Start")+
+  labs(
+    title=str_wrap("Logit FvP/FmP By Minutes From Start Across
+                   Inoculation Treatment in Tomato", 50)
+  )+
+  theme(
+    text = element_text(size=24, family="mont"),
+    legend.position = "none",
+    legend.title = element_text(size=24, family="mont", face="bold"),
+    legend.text = element_text(size=20, family="mont"),
+    legend.key.height = unit(.3, "cm"),
+    legend.background = element_rect(color=four_colors[3], fill=NA, 
+                                     linewidth=.5, linetype = 2),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold", lineheight = .5)
+  )
+```
+
+### 3.1.6 FvP/FmP analysis
+
+Because FvP/FmP is a unitless ratio from 0:1, we can logit transform it and then treat it as if it were normal.
+
+```{r FvPFmP_analysis}
+# Linear model of logit transformed FvPFmP as a function of Treatment with days from germination as a fixed effect
+mod_FvP_dfg_s <- summary(mod_FvP_dfg <- (lm(
+  logitFvPFmP ~ Treatment + DaysFromGermination,
+  data = m_data)))
+print(mod_FvP_dfg_s)
+## R2 0.06736
+
+# Linear model of logit transformed FvPFmP as a function of Treatment with minutes from start as a fixed effect
+mod_FvP_min_s <- summary(mod_FvP_min <- (lm(
+  logitFvPFmP ~ Treatment + MinutesFromStart,
+  data = m_data)))
+print(mod_FvP_min_s)
+## R2 0.09377
+
+# Linear model of logit transformed FvPFmP as a function of Treatment with Light Intensity as a fixed effect
+mod_FvP_l_s <- summary(mod_FvP_l<- (lm(
+  logitFvPFmP ~ Treatment + Light.Intensity..PAR.,
+  data = m_data)))
+print(mod_FvP_l_s)
+## R2 0.06926
+
+# Linear model of logit transformed FvPFmP as a function of Treatment with Light Intensity  AND minutes from start as fixed effects
+mod_FvP_lm_s <- summary(mod_FvP_lm<- (lm(
+  logitFvPFmP ~ Treatment + Light.Intensity..PAR. + MinutesFromStart,
+  data = m_data)))
+print(mod_FvP_lm_s)
+## R2 0.06926
+
+
+```
+
+## 3.2 Fruit
+
+### 3.2.1 Mass exploratory
+
+```{r mass_exploratory}
+# PDF, CDF, and KS test
+multiPDF_Z(Fl_data$mass, 100, "all", a_palette, "Mass")
+multiCDF_Z(Fl_data$mass, 100, "all", a_palette, "Mass")
+multiKS_cont(Fl_data$mass, "all")
+
+# Tests for homoscedasticity
+leveneTest(Fl_data$mass~Fl_data$Treatment)
+
+## plot of mass by treatment with box plots and jittered points
+ggplot(data=Fl_data_no_BER, aes(x=Treatment, y=mass, color=Treatment, fill=Treatment))+
+  geom_boxplot(width=0.3, alpha=0.5, outliers = FALSE)+
+  geom_jitter(width=0.1)+
   scale_fill_manual(values=four_colors)+
   scale_color_manual(values=four_colors)+
-  #xlim(-0.25, 1.5)+
-  ylab("Density")+
-  xlab("Mass(g)")+
-  theme_minimal()+
+  ylab("Tomato Mass (g)")+
+  xlab("Treatment")+
+  theme_bw()+
   labs(
-    title=str_wrap("Mass Density for Inoculation Treatments in Tomato", 40)
+    title="Tomato Mass by Treatment"
   )+
   theme(
     legend.position="none",
-    text = element_text(size=24, family="mont", lineheight = 0.5),
-    axis.title.y = element_text(size=0),
-    axis.text = element_text(size=24, family="mont"),
+    text = element_text(size=24, family="mont", face="bold"),
     axis.title = element_text(size=24, family = "mont", face= "bold"),
     title = element_text(size=30, family="open", face="bold")
   )
 
-## Density plot for mass by plant across no BER tomatoes (exploratory)
-ggplot(data=Fl_data_no_BER, aes(x=mass, y = plant_fac, color=Treatment, fill=Treatment))+
-  geom_density_ridges()+
+## plot of mass mean per plant by treatment with box plots and jittered points
+ggplot(data=Fl_means_byplant, aes(x=Treatment, y=mass_mean, color=Treatment, fill=Treatment))+
+  geom_boxplot(width=0.3, alpha=0.5, outliers = FALSE)+
+  geom_jitter(width=0.1)+
   scale_fill_manual(values=four_colors)+
   scale_color_manual(values=four_colors)+
-  xlim(0, 400)+
-  ylab("Plant")+
-  xlab("Mass (g)")+
-  theme_minimal()+
+  ylab("Mean Tomato Mass (g)")+
+  xlab("Treatment")+
+  theme_bw()+
+  #facet_wrap(~Treatment)+
   labs(
-    title=str_wrap("Mass Density for Individual Plants Across Inoculation Treatments in Tomato", 50)
-  )+
-  theme(
-    legend.position="right",
-    text = element_text(size=24, family="mont", lineheight = 0.5),
-    axis.text.x = element_text(size=24, family="mont"),
-    axis.text.y = element_text(size=12, family="mont"),
-    axis.title = element_text(size=28, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
-  )
-
-## Density plots for sugar by treatment across no BER tomatoes (exploratory)
-ggplot(data=Fl_data_no_BER, aes(x=sugar_avg, y = Treatment, color=Treatment, fill=Treatment))+
-  geom_density_ridges()+
-  scale_fill_manual(values=four_colors)+
-  scale_color_manual(values=four_colors)+
-  #xlim(-0.25, 1.5)+
-  ylab("Density")+
-  xlab("Sugar Concentration (%)")+
-  theme_minimal()+
-  labs(
-    title=str_wrap("Sugar Concentration Density for Inoculation Treatments in Tomato", 40)
+    title=str_wrap("Mean Tomato Mass Per Plant across Treatments", 50)
   )+
   theme(
     legend.position="none",
-    text = element_text(size=24, family="mont", lineheight = 0.5),
-    axis.title.y = element_text(size=0),
-    axis.text = element_text(size=24, family="mont"),
+    text = element_text(size=24, family="mont", face="bold", lineheight=0.5),
     axis.title = element_text(size=24, family = "mont", face= "bold"),
     title = element_text(size=30, family="open", face="bold")
   )
 
-## Density plots for sugar by plant across no BER tomatoes (exploratory)
-ggplot(data=Fl_data_no_BER, aes(x=sugar_avg, y = plant_fac, color=Treatment, fill=Treatment))+
-  geom_density_ridges()+
+
+```
+
+### 3.2.2 Mass analysis
+
+According to the PDFs, CDFs, and Kolmogorov-Smirnov tests, mass follows a **Gamma** or **Lognormal** distribution. I am unsure of whether to analyze it with each fruit as an observation or with each plant as an observation, where I'm looking at the mean tomato mass per plant instead of the individual tomato masses.
+```{r mass_analysis}
+# INDIVIDUAL GAMMA glm
+mT_glm_g_s <- summary(mT_glm_g <- glm(mass~Treatment, data=Fl_data, family=Gamma(link="log")))
+print(mT_glm_g_s)
+mT_glm_g_pseudoR2 <- (mT_glm_g_s$null.deviance - mT_glm_g_s$deviance)/mT_glm_g_s$null.deviance
+print(mT_glm_g_pseudoR2)
+## super high AIC and terrible PR2, so probably not the way to do it.
+
+# GROUPED GAMMA glm
+mTg_glm_g_s <- summary(mTg_glm <- glm(mass_mean~Treatment, data=Fl_means_byplant, family=Gamma(link="log")))
+print(mTg_glm_g_s)
+mTg_glm_g_pseudoR2 <- (mTg_glm_g_s$null.deviance - mTg_glm_g_s$deviance)/mTg_glm_g_s$null.deviance
+print(mTg_glm_g_pseudoR2)
+
+# GROUPED Lognormal glm
+mTg_glm_ln_s <- summary(mTg_glm_ln <- glm(mass_mean~Treatment, data=Fl_means_byplant, family=gaussian(link="log")))
+print(mTg_glm_ln_s)
+mTg_glm_ln_pseudoR2 <- (mTg_glm_ln_s$null.deviance - mTg_glm_ln_s$deviance)/mTg_glm_ln_s$null.deviance
+print(mTg_glm_ln_pseudoR2)
+
+# Predictions
+## How do I predict these?
+
+# Post Hoc Tests
+
+```
+
+### 3.2.3 Sugar exploratory
+
+```{r sugar_exploratory}
+
+# PDF, CDF, and KS test
+multiPDF_Z(Fl_data_no_BER$sugar_avg, 100, "all", a_palette, "Sugar Concentration")
+multiCDF_Z(Fl_data_no_BER$sugar_avg, 100, "all", a_palette, "Sugar Concentration")
+multiKS_cont(Fl_data_no_BER$sugar_avg, "all")
+
+
+## plot sugar by treatment as a boxplot with violins and jitter
+ggplot(data=Fl_data_no_BER, aes(x=Treatment, y=sugar_avg, color=Treatment, fill=Treatment))+
+  geom_boxplot(width=0.3, alpha=0.5, outliers = FALSE)+
+  geom_jitter(width=0.1)+
   scale_fill_manual(values=four_colors)+
   scale_color_manual(values=four_colors)+
-  xlim(3, 9)+
-  ylab("Plant")+
-  xlab("Sugar Concentration (%)")+
-  theme_minimal()+
+  ylab("Sugar Concentration (%)")+
+  xlab("Treatment")+
+  theme_bw()+
+  #facet_wrap(~Treatment)+
   labs(
-    title=str_wrap("Sugar Concentration Density for Individual Plants Across Inoculation Treatments in Tomato", 50)
+    title=str_wrap("Tomato Sugar Concentration by Treatment", 40)
   )+
   theme(
-    legend.position="right",
-    text = element_text(size=24, family="mont", lineheight = 0.5),
-    axis.text.y = element_text(size=12, family="mont"),
-    axis.title = element_text(size=28, family = "mont", face= "bold"),
+    legend.position="none",
+    text = element_text(size=24, family="mont", face="bold", lineheight=0.5),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    title = element_text(size=30, family="open", face="bold")
+  )
+
+## plot sugar means per plant by treatment as a boxplot with violins and jitter
+ggplot(data=Fl_means_byplant, aes(x=Treatment, y=sugar_avg_mean, color=Treatment, fill=Treatment))+
+  geom_boxplot(width=0.3, alpha=0.5, outliers = FALSE)+
+  geom_jitter(width=0.1)+
+  scale_fill_manual(values=four_colors)+
+  scale_color_manual(values=four_colors)+
+  ylab("Sugar Concentration (%)")+
+  xlab("Treatment")+
+  theme_bw()+
+  #facet_wrap(~Treatment)+
+  labs(
+    title=str_wrap("Mean Tomato Sugar Concentration per Plant across Treatments", 40)
+  )+
+  theme(
+    legend.position="none",
+    text = element_text(size=24, family="mont", face="bold", lineheight=0.5),
+    axis.title = element_text(size=24, family = "mont", face= "bold"),
     title = element_text(size=30, family="open", face="bold")
   )
 
@@ -1250,14 +1289,42 @@ ggplot(data=Fl_data_no_BER, aes(x=mass, y=sugar_avg,
     title="Tomato Sugar Concentration by Mass"
   )+
   theme(
-    legend.position="right",
+    legend.position="none",
     text = element_text(size=24, family="mont", face="bold"),
     axis.title = element_text(size=24, family = "mont", face= "bold"),
     title = element_text(size=30, family="open", face="bold")
   )
 
+
+```
+
+### 3.2.3 Sugar analysis
+
+Sugar appears to have either a Normal or Gamma distribution, so we'll test both.
+
+```{r sugar_analysis}
+
+# Individual Gamma GLM
+mod_sug_g_s <- summary(mod_sug_g <- glm(sugar_avg ~ Treatment, data = Fl_data_no_BER,
+                                        family = Gamma(link = "log")))
+print(mod_sug_g_s)
+
+
+# Grouped Gamma glm
+mod_sugG_g_s <- summary(mod_sug_g <- glm(sugar_avg_mean ~ Treatment, data = Fl_means_byplant,
+                                        family = Gamma(link = "log")))
+print(mod_sugG_g_s)
+
+
+```
+
+## 3.3 Harvest
+
+### 3.3.1 Harvest exploratory
+
+```{r harvest_exploratory}
 ## scatter plot of ripeness by 'days from harvest to analysis' grouped by treatment (exploratory, to see how delayed analysis may affect sugar content [hopefully it doesn't])
-ggplot(data=Fl_data_no_BER, aes(x=d_diff, y=ripeness, 
+ggplot(data=Fl_data_no_BER, aes(x=DaysFromHarvestToAnalysis, y=ripeness, 
                                 fill=Treatment, shape=Treatment,
                                 color=Treatment))+
     geom_jitter()+
@@ -1266,7 +1333,7 @@ ggplot(data=Fl_data_no_BER, aes(x=d_diff, y=ripeness,
   scale_shape_manual(values=four_shapes)+
   ylab("Ripeness")+
   xlab("Days from Harvest to Analysis")+
-  theme_minimal()+
+  theme_bw()+
   #facet_wrap(~Treatment)+
   labs(
     title="Tomato Ripeness by Days from Harvest to Analysis"
@@ -1279,7 +1346,7 @@ ggplot(data=Fl_data_no_BER, aes(x=d_diff, y=ripeness,
   )
 
 ## scatter plot of sugar by days from harvest to analysis grouped by treatment (exploratory, to see how delayed analysis may affect sugar content [hopefully it doesn't])
-ggplot(data=Fl_data_no_BER, aes(x=d_diff, y=sugar_avg, 
+ggplot(data=Fl_data_no_BER, aes(x=DaysFromHarvestToAnalysis, y=sugar_avg, 
                                 fill=Treatment, shape=Treatment,
                                 color=Treatment))+
   geom_jitter()+
@@ -1288,7 +1355,7 @@ ggplot(data=Fl_data_no_BER, aes(x=d_diff, y=sugar_avg,
   scale_color_manual(values=four_colors)+
   ylab("Sugar Concentration (%)")+
   xlab("Days from Harvest to Analysis")+
-  theme_minimal()+
+  theme_bw()+
   #facet_wrap(~Treatment)+
   labs(
     title="Tomato Sugar Concentration by Days from Harvest to Analysis"
@@ -1299,72 +1366,21 @@ ggplot(data=Fl_data_no_BER, aes(x=d_diff, y=sugar_avg,
     axis.title = element_text(size=24, family = "mont", face= "bold"),
     title = element_text(size=30, family="open", face="bold")
   )
-
-
 ```
 
+### 3.3.2 Harvest analysis
 
-### 3.2.2 Fruit Occurrence Analysis
-
-Looking at the occurrence of BER, fungus, and cracking by various groups.
-
-Because of how few counts we had for certain factors (<50 observations for each group in BER, cracking, fungus), a chi-square was not suitable, so Fisher's exact test was used.
-
-```{r fruit_analysis, include=TRUE, echo=TRUE}
-
-## Treatment grouped fisher test and row-wise fisher test for BER
-sum_BER_tab <- as.table(cbind(Fl_data_summary$Treatment,
-                              Fl_data_summary$BER_sum))
-fisher.test(Fl_data_summary$BER_sum, y=Fl_data_summary$Treatment)
-row_wise_fisher_test(xtab = sum_BER_tab)
-
-## Treatment grouped fishers exact test on fruit
-sum_fruit_tab <- as.table(cbind(Fl_data_summary$Treatment,
-                                Fl_data_summary$fruit_sum))
-fisher.test(Fl_data_summary$fruit_sum, y=Fl_data_summary$Treatment)
-row_wise_fisher_test(xtab = sum_fruit_tab)
-
-## Treatment grouped fishers exact test on fungus
-sum_fungus_tab <- as.table(cbind(Fl_data_summary$Treatment,
-                              Fl_data_summary$fungus_sum))
-fisher.test(Fl_data_summary$fungus_sum, y=Fl_data_summary$Treatment)
-row_wise_fisher_test(xtab = sum_fungus_tab)
-
-## Treatment grouped fishers exact test on cracking
-sum_cracking_tab <- as.table(cbind(Fl_data_summary$Treatment,
-                                   Fl_data_summary$cracking_sum))
-fisher.test(Fl_data_summary$cracking_sum, y=Fl_data_summary$Treatment)
-row_wise_fisher_test(xtab = sum_cracking_tab)
-
-## Mass bin grouped fishers exact test on BER
-mb_BER_tab <- as.table(cbind(Fl_data_mb$Treatment, Fl_data_mb$BER_sum))
-fisher.test(Fl_data_mb$BER_sum, y=Fl_data_mb$Treatment)
-row_wise_fisher_test(xtab = mb_BER_tab)
-
-## Mass bin grouped fishers exact test on fruit
-mb_fruit_tab <- as.table(cbind(Fl_data_mb$Treatment, Fl_data_mb$fruit_sum))
-fisher.test(Fl_data_mb$fruit_sum, y=Fl_data_mb$Treatment)
-row_wise_fisher_test(xtab = mb_fruit_tab)
-
-## Mass bin grouped fishers exact test on fungus
-mb_fungus_tab <- as.table(cbind(Fl_data_mb$Treatment, Fl_data_mb$fungus_sum))
-fisher.test(Fl_data_mb$fungus_sum, y=Fl_data_mb$Treatment)
-row_wise_fisher_test(xtab = mb_fungus_tab)
-
-## Mass bin grouped fishers exact test on cracking
-mb_cracking_tab <- as.table(cbind(Fl_data_mb$Treatment,
-                                  Fl_data_mb$cracking_sum))
-fisher.test(Fl_data_mb$cracking_sum, y=Fl_data_mb$Treatment)
-row_wise_fisher_test(xtab = mb_cracking_tab)
+do tests n shit
+```{r harvest_analysis}
 
 ## probability of BER for each mass bin
-ggplot(data=Fl_data_mb, aes(x=mass_bin, y=pBER, fill=mass_bin))+
+ggplot(data=Fl_data_mb, aes(x=mass_bin, y=pBER*100, fill=mass_bin))+
   geom_col()+
   ylim(0, 50)+
   scale_fill_manual(values=ten_col)+
   ylab("BER Probability (%)")+
   xlab("Mass Bin (g)")+
-  theme_minimal()+
+  theme_bw()+
   labs(
     title="Tomato BER Probability by Mass Bin"
   )+
@@ -1381,7 +1397,7 @@ ggplot(data=Fl_data_summary, aes(x=Treatment, y=pBER*100, fill=Treatment))+
   scale_fill_manual(values=four_colors)+
   ylab("Percent of Fruit w/ BER")+
   xlab("Treatment")+
-  theme_minimal()+
+  theme_bw()+
   labs(
     title="Tomato Fruit Blossom End Rot Occurrence by Treatment"
   )+
@@ -1398,7 +1414,7 @@ ggplot(data=Fl_data_summary, aes(x=Treatment, y=fruit_sum, fill=Treatment))+
   scale_fill_manual(values=four_colors)+
   ylab("Fruit Count")+
   xlab("Treatment")+
-  theme_minimal()+
+  theme_bw()+
   labs(
     title="Total Fruit Count by Inoculation Treatment"
   )+
@@ -1415,7 +1431,7 @@ ggplot(data=Fl_data, aes(x=Treatment, y=Fl_data[order(Fl_data$BER),]$fruit, fill
   scale_fill_manual(values=two_colors)+
   ylab("Fruit Count")+
   xlab("Treatment")+
-  theme_minimal()+
+  theme_bw()+
   guides(fill=guide_legend(title=str_wrap("Blossom end rot", 8)))+
   labs(
     title="Tomato Fruit and BER Count by Treatment"
@@ -1436,7 +1452,7 @@ ggplot(data=Fl_data, aes(x=mass_bin, y=Fl_data[order(Fl_data$BER),]$fruit, fill=
   guides(fill=guide_legend(title=str_wrap("Blossom end rot", 8)))+
   ylab("Fruit Count")+
   xlab("Mass Bin")+
-  theme_minimal()+
+  theme_bw()+
   labs(
     title="Tomato Fruit and BER Count by Mass Bin"
   )+
@@ -1460,7 +1476,7 @@ ggplot(data=Fl_data, aes(x=plant, y=Fl_data[order(Fl_data$BER),]$fruit, fill=BER
   ylab("Fruit Count")+
   xlab("Plant")+
   facet_wrap(~Treatment)+
-  theme_minimal()+
+  theme_bw()+
   labs(
     title="Tomato Fruit and BER Count by Plant"
   )+
@@ -1482,7 +1498,7 @@ ggplot(data=Fl_data_summary, aes(x=Treatment, y=mass_sum/1000,
   scale_fill_manual(values=four_colors)+
   ylab("Total Fruit Mass (kg)")+
   xlab("Treatment")+
-  theme_minimal()+
+  theme_bw()+
   labs(
     title="Total Tomato Fruit Harvest across Inoculation Treatments"
   )+
@@ -1502,7 +1518,7 @@ ggplot(data=Fl_sum_byplant, aes(x=plant, y=mass_sum/1000,
   scale_x_discrete(name="Plant", breaks=c("3","6","9"))+
   ylab("Total Fruit Mass (kg)")+
   xlab("Plant")+
-  theme_minimal()+
+  theme_bw()+
   labs(
     title="Total Tomato Fruit Harvest across Individual Plants"
   )+
@@ -1516,13 +1532,13 @@ ggplot(data=Fl_sum_byplant, aes(x=plant, y=mass_sum/1000,
 ## plot of fruit mass by treatment
 ggplot(data=Fl_sum_byplant, aes(x=Treatment, y=mass_sum/1000, color=Treatment, fill=Treatment))+
   geom_violin(alpha=0.5)+
-  geom_boxplot(width=0.2, alpha=0.5)+
+  geom_boxplot(width=0.2, alpha=0.5, outliers = FALSE)+
   geom_jitter(width=0.1)+
     scale_fill_manual(values=four_colors)+
     scale_color_manual(values=four_colors)+
   ylab("Mass Sum (kg)")+
   xlab("Treatment")+
-  theme_minimal()+
+  theme_bw()+
   labs(
     title="Total Fruit Mass per Plant across Inoculation Treatments"
   )+
@@ -1536,13 +1552,13 @@ ggplot(data=Fl_sum_byplant, aes(x=Treatment, y=mass_sum/1000, color=Treatment, f
 ## plot of fruit count by treatment
 ggplot(data=Fl_sum_byplant, aes(x=Treatment, y=fruit_sum, color=Treatment, fill=Treatment))+
   geom_violin(alpha=0.5)+
-  geom_boxplot(width=0.2, alpha=0.5)+
+  geom_boxplot(width=0.2, alpha=0.5, outliers = FALSE)+
   geom_jitter(width=0.1)+
     scale_fill_manual(values=four_colors)+
     scale_color_manual(values=four_colors)+
   ylab("Fruit Count")+
   xlab("Treatment")+
-  theme_minimal()+
+  theme_bw()+
   labs(
     title="Tomato Plant Harvested Fruit Count Across Inoculation Treatments"
   )+
@@ -1566,142 +1582,14 @@ ggplot(data=Fl_avg_sums, aes(x=Treatment, y=mean, fill=Treatment))+
   scale_fill_manual(values=four_colors)+
   ylab("Total Mass (kg)")+
   xlab("Treatment")+
-  theme_minimal()+
+    labs(
+    title="Total Tomato Fruit Mass (kg) Across Inoculation Treatments"
+  )+
+  theme_bw()+
   theme(
     legend.position="none",
     text = element_text(size=24, family="mont", face="bold"),
     axis.title = element_text(size=24, family = "mont", face= "bold"),
     title = element_text(size=30, family="open", face="bold")
   )
-
-```
-
-### 3.2.3 Mass Analysis
-
-```{r mass_analysis, include=TRUE, echo=TRUE}
-
-#Kruskal-Wallis on mass as a function of Treatment
-kruskal.test(mass ~ Treatment, data=Fl_data)
-kruskal.test(mass_sum ~ Treatment, data=Fl_sum_byplant)
-
-# Pairwise wilcox test on mass as a function of treatment
-pairwise.wilcox.test(Fl_data$mass, Fl_data$Treatment)
-pairwise.wilcox.test(Fl_sum_byplant$mass_sum, Fl_sum_byplant$Treatment)
-
-mT_glm_s <- summary(mT_glm <- glm(mass~Treatment, data=Fl_data, family=Gamma(link="log")))
-mT_glm_pseudoR2 <- (mT_glm_s$null.deviance - mT_glm_s$deviance)/mT_glm_s$null.deviance
-
-summary(glm(mass_sum~Treatment, data=Fl_sum_byplant, family=Gamma(link="log")))
-
-## plot of mass by treatment with box plots, violins, and jittered points
-ggplot(data=Fl_data_no_BER, aes(x=Treatment, y=mass, color=Treatment, fill=Treatment))+
-  geom_violin(alpha=0.5)+
-  geom_boxplot(width=0.2, alpha=0.5)+
-  geom_jitter(width=0.1)+
-  stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans")), size=8, family="mont")+
-  stat_compare_means(label.x=3.25, label.y=425, size=8, family="mont")+
-    scale_fill_manual(values=four_colors)+
-    scale_color_manual(values=four_colors)+
-  ylab("Tomato Mass (g)")+
-  xlab("Treatment")+
-  theme_minimal()+
-  #facet_wrap(~Treatment)+
-  labs(
-    title="Tomato Mass by Microbial Inoculation Timing"
-  )+
-  theme(
-    legend.position="none",
-    text = element_text(size=24, family="mont", face="bold"),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
-  )
-
-## plot of mass mean per plant by treatment with box plots, violins, and jittered points
-ggplot(data=Fl_means_byplant, aes(x=Treatment, y=mass_mean, color=Treatment, fill=Treatment))+
-  geom_violin(alpha=0.5)+
-  geom_boxplot(width=0.2, alpha=0.5)+
-  geom_jitter(width=0.1)+
-  stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans")), size=8, family="mont")+
-  stat_compare_means(label.x=3.25, size=8, family="mont")+
-    scale_fill_manual(values=four_colors)+
-    scale_color_manual(values=four_colors)+
-  ylab("Tomato Mass (g)")+
-  xlab("Treatment")+
-  theme_minimal()+
-  #facet_wrap(~Treatment)+
-  labs(
-    title=str_wrap("Mean Tomato Mass by Plant across Microbial Inoculation Timing", 50)
-  )+
-  theme(
-    legend.position="none",
-    text = element_text(size=24, family="mont", face="bold", lineheight=0.5),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
-  )
-```
-
-### 3.2.4 Sugar Analysis
-
-```{r sugar_analysis, include=TRUE, echo=TRUE}
-
-# Linear mixed model of sugar as a function of treatment with plant as a random effect
-#summary(model_sugar_no_BER <- (lmer(
-#  sugar_avg ~ Treatment + (1| plant_fac),
-#  data = Fl_data_no_BER)))
-
-#summary(lm_sugar_no_BER <- (lm(
-#  sugar_avg ~ Treatment,
-#  data = Fl_data_no_BER)))
-
-#TUKEY (more or less) on the LMER
-#difflsmeans(model_sugar_no_BER)
-
-## plot sugar by treatment as a boxplot with violins and jitter
-ggplot(data=Fl_data_no_BER, aes(x=Treatment, y=sugar_avg, color=Treatment, fill=Treatment))+
-  geom_violin(alpha=0.5)+
-  geom_boxplot(width=0.2, alpha=0.5)+
-  geom_jitter(width=0.1)+
-    stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans")), size=8, family="mont")+
-  stat_compare_means(label.x=3.5, label.y=11, size=8, family="mont")+
-  scale_fill_manual(values=four_colors)+
-  scale_color_manual(values=four_colors)+
-  ylab("Sugar Concentration (%)")+
-  xlab("Treatment")+
-  theme_minimal()+
-  #facet_wrap(~Treatment)+
-  labs(
-    title=str_wrap("Tomato Sugar Concentration by Microbial Inoculation Timing", 40)
-  )+
-  theme(
-    legend.position="none",
-    text = element_text(size=24, family="mont", face="bold", lineheight=0.5),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
-  )
-
-sugar_kw <- kruskal.test(sugar_avg_mean~Treatment, Fl_means_byplant)
-
-## plot sugar means per plant by treatment as a boxplot with violins and jitter
-ggplot(data=Fl_means_byplant, aes(x=Treatment, y=sugar_avg_mean, color=Treatment, fill=Treatment))+
-  geom_violin(alpha=0.5)+
-  geom_boxplot(width=0.2, alpha=0.5)+
-  geom_jitter(width=0.1)+
-    stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans")), size=8, family="mont")+
-  annotate("text", x=3.5, y=8.5, family="mont", label= paste("Kruskal-Wallis, p=", round(sugar_kw$p.value, 4)), size=8)+
-  scale_fill_manual(values=four_colors)+
-  scale_color_manual(values=four_colors)+
-  ylab("Sugar Concentration (%)")+
-  xlab("Treatment")+
-  theme_minimal()+
-  #facet_wrap(~Treatment)+
-  labs(
-    title=str_wrap("Tomato Plant Sugar Concentration Mean by Microbial Inoculation Timing", 40)
-  )+
-  theme(
-    legend.position="none",
-    text = element_text(size=24, family="mont", face="bold", lineheight=0.5),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
-  )
-
 ```

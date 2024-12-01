@@ -27,20 +27,29 @@ This uses R, the packages tidyverse, shiny, showtext, scico, bslib, MASS, ggpubr
 ### 1. Li-600
 
 #### Explanatory variables
- - Treatment
- - relative humidity
- - ambient light
+- Treatment
+  - Type: factor
+  - Discrete: [Control, Germination, Transplantation, Germ+Trans]
+- Date
+  - Type: date
+  - Discrete: [5/28/2024:8/6/2024]
+- Days Since Germination
+  - Type: numeric
+  - Unit: days
+  - Discrete: [15,100]
 
 #### Response Variables
- - gsw - stomatal conductance
-    - distribution most similar to gamma, lognormal
-    - not homoscedastic by Levene and Bartlett tests
-    - continuous [0.0:3.0]
- - PhiPS2 - quantum yield in light
-    - significantly different from all cont distributions
-        - most similar to gamma, lognormal
-    - not homoscedastic by Levene and Bartlett tests
-    - continuous [0.5:1.0]
+- gsw - stomatal conductance
+  - Unit: mol+1m-2s-1
+  - distribution most similar to gamma, lognormal
+  - not homoscedastic by Levene and Bartlett tests
+  - continuous [0.0:3.0]
+- PhiPS2 - From Li-600 manual: quantum efficiency in light
+  - Unit: unitless
+  - significantly different from all cont distributions
+      - most similar to gamma, lognormal
+  - not homoscedastic by Levene and Bartlett tests
+  - continuous [0.0:1.0]
 
 ### 2. Multispeq
 
@@ -55,7 +64,7 @@ This uses R, the packages tidyverse, shiny, showtext, scico, bslib, MASS, ggpubr
       - most similar to normal, lognormal, and gamma
     - homoscedastic by Levene and Bartlett tests
     - continuous, [0.7:0.8]
- - PhiPS2 - quantum yield in light
+ - PhiPS2 - From MultispeQ documentation: quantum yield in light
     - not significantly different from normal, lognormal, or gamma distribution
     - not homoscedastic by Levene and Bartlett tests
     - continuous [0.45:0.70]
@@ -73,8 +82,6 @@ This uses R, the packages tidyverse, shiny, showtext, scico, bslib, MASS, ggpubr
 # Acknowledgements
 
 This work could not have been possible without my incredible thesis advisor Mario Bretfeld, my committee, and my undergrads: Maddie, Minh, Serena, Collin, Kenadi, Sky, and Vanessa.
-
-The color palette is based on the SLS08 palette by Luis Miguel Maldonado. [Link Here](https://lospec.com/palette-list/slso8)
 
 Thanks to the open source community and all the contributors and maintainers out there. I acknowledge and appreciate your hard work and dedication to open knowledge and tools.
 

@@ -141,7 +141,7 @@ iqr_sug <- IQR(na.omit(Fl_data$sugar_avg))
 ## harvest vars
 hvars <- c("fruit_sum", "mass_sum",
            "BER_sum", "fungus_sum", "cracking_sum",
-           "pBER", "pfungus", "pcracking")
+           "pBER", "pfungus", "pcracking", "Treatment")
 
 ## themes
 #light = bs_theme(bg = "white",
@@ -765,7 +765,7 @@ ui <- navbarPage(title = "Tomato Inoculants",
           layout_sidebar(sidebar = sidebar(
             selectInput("hbp_y","Y Variable",
                         choices = hvars, selected = "mass"),
-            selectInput("hbp_col","Color Variable",
+            selectInput("hbp_color","Color Variable",
                         choices = hvars, selected = "BER"),
             checkboxInput("hbp_fwrap", "Individual Plot Per Treatment", FALSE)
           ),
@@ -776,7 +776,7 @@ ui <- navbarPage(title = "Tomato Inoculants",
               layout_sidebar(sidebar = sidebar(
                 selectInput("hmb_y","Y Variable",
                             choices = hvars, selected = "mass"),
-                selectInput("hmb_col","Color Variable",
+                selectInput("hmb_color","Color Variable",
                             choices = hvars, selected = "BER"),
                 checkboxInput("hmb_fwrap", "Individual Plot Per Treatment", FALSE)
               ),
@@ -851,6 +851,12 @@ observe(session$setCurrentTheme(
   Rhbp_dists <- reactive({input$hbp_dists})
   Rhmb_dists <- reactive({input$hmb_dists})
   Rh_var <- reactive({input$h_var})
+  Rhbp_y <- reactive ({input$hbp_y})
+  Rhmb_y <- reactive ({input$hmb_y})
+  Rhbp_color <- reactive({input$hbp_color})
+  Rhmb_color <- reactive({input$hmb_color})
+  Rhbp_fwrap <- reactive({input$hbp_fwrap})
+  Rhmb_fwrap <- reactive({input$hmb_fwrap})
 ## Reactive dataframes
 ### Li-600 data
   RLi_data <- reactive({
@@ -1807,6 +1813,47 @@ output$hmb_bartlett <- renderPrint({
   bartlett.test(RFl_data_mb()[[v]]~Treatment, data=RFl_data_mb())
 })
 ## Plots
+output$hbp_col <- renderPlot({
+  v <- Rhbp_y()
+  x <- RFlbp_summary()[[v]]
+  p <- ggplot(data=RFlbp_summary(), aes(x=plant_fac, y=x, fill=.data[[Rhbp_color()]]))+
+    geom_col()+
+    scale_color_scico_d(begin=0.9, end=0, palette = gettext(Rpalette()))+
+    ylab(gettext(Rh_var()))+
+    xlab("Plant")+
+    theme_minimal()+
+    theme(
+      legend.position="right",
+      text = element_text(size=24, family="mont", face="bold"),
+      axis.title = element_text(size=24, family = "mont", face= "bold"),
+      axis.text.x = element_text(angle = 45, hjust=1, vjust=1)
+    )
+  if (Rhbp_fwrap() == TRUE) {
+    p <- p + facet_wrap(~Treatment)
+  }
+  return(p)
+})
+
+output$hmb_col <- renderPlot({
+  v <- Rhmb_y()
+  x <- RFl_data_mb()[[v]]
+  p <- ggplot(data=RFl_data_mb(), aes(x=mass_bin, y=x, fill=.data[[Rhmb_color()]]))+
+    geom_col()+
+    scale_color_scico_d(begin=0.9, end=0, palette = gettext(Rpalette()))+
+    ylab(gettext(Rh_var()))+
+    xlab("Mass Bin")+
+    theme_minimal()+
+    theme(
+      legend.position="right",
+      text = element_text(size=24, family="mont", face="bold"),
+      axis.title = element_text(size=24, family = "mont", face= "bold"),
+      axis.text.x = element_text(angle = 45, hjust=1, vjust=1)
+    )
+  if (Rhmb_fwrap() == TRUE) {
+    p <- p + facet_wrap(~Treatment)
+  }
+  return(p)
+})
 
 ## Stats
 
