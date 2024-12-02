@@ -35,6 +35,7 @@ STATISTICS
  - MASS
  - rstatix
  - pwr
+ - multcomp
  
 GRAPHING
  - showtext
@@ -49,7 +50,7 @@ OTHER
 
 ```{r setup, include=FALSE}
 # get packages
-require(tidyverse); require(lme4); require(showtext); require(scico); require(pwr); require(car); require(ggpubr); require(rstatix); require(MASS); require(devtools)
+require(tidyverse); require(lme4); require(showtext); require(scico); require(pwr); require(car); require(ggpubr); require(rstatix); require(MASS); require(devtools); require(multcomp)
 
 ## secondary packages (requires devtools)
 install_github("zachpeagler/multiFitR")
@@ -312,32 +313,29 @@ leveneTest(Li_data$gsw~Li_data$Treatment)
 ## in gsw as a function of time from start
 leveneTest(Li_data$gsw~Li_data$MinutesFromStart)
 
-## gsw by Treatment boxplot
+## box plot by Treatment boxplot
 ggplot(data = Li_data, aes(x= Treatment, y = gsw, fill=Treatment, color=Treatment)) +
   geom_boxplot(alpha=.5, width=0.3, outliers = FALSE)+
     geom_jitter( width=.15, height=0)+
-#    stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans")), size=8, family="mont")+
-#  stat_compare_means(label.x=3, label.y=3.5, size=8,family="mont")+
   scale_fill_manual(values=four_colors)+
   scale_color_manual(values=four_colors)+
   labs(
     title=str_wrap("Stomatal Conductance Across Inoculation Treatments in Tomato", 40)
   ) +
   ylab("Stomatal Conductance (mol m-2 s-1)")+
+  annotate("text", x=1:4, y=3, label = c("a", "b", "b", "b"), size=5, family="open")+
   theme_bw()+
   theme(
     legend.position="none",
-    text = element_text(size=24, family="mont", lineheight=0.5),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
+    text = element_text(size=16, family="mont", lineheight=0.8),
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold")
   )
 
 # Mean GSW per plant by Treatment boxplot 
 ggplot(data = Li_data_stats_byplant, aes(x= Treatment, y = gsw_mean, fill=Treatment, color=Treatment)) +
   geom_boxplot(alpha=.5, width=0.3, outliers = FALSE)+
     geom_jitter( width=.15, height=0)+
-#    stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Germination", "Transplantation"), c("Germination", "Germ+Trans"), c("Transplantation", "Germ+Trans")), size=8, family="mont")+
-#  stat_compare_means(label.x=3, label.y=.8, size=8,family="mont")+
   scale_fill_manual(values=four_colors)+
   scale_color_manual(values=four_colors)+
   labs(
@@ -348,9 +346,9 @@ ggplot(data = Li_data_stats_byplant, aes(x= Treatment, y = gsw_mean, fill=Treatm
   theme_bw()+
   theme(
     legend.position="none",
-    text = element_text(size=24, family="mont", lineheight=0.5),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
+    text = element_text(size=16, family="mont", lineheight=0.8),
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold")
   )
 
 # GSW by date across relative humidity
@@ -367,16 +365,16 @@ ggplot(data = Li_data, aes(x=DaysFromGermination, y = gsw,
   )+
     guides(color=guide_colorbar(title=str_wrap("Relative Humidity", 10)))+
   theme(
-    text = element_text(size=24, family="mont"),
-    legend.title = element_text(size=24, family="mont", face="bold"),
-    legend.text = element_text(size=20, family="mont"),
+    text = element_text(size=16, family="mont"),
+    legend.title = element_text(size=16, family="mont", face="bold"),
+    legend.text = element_text(size=14, family="mont"),
     legend.position="right",
     legend.title.position = "top",
-    legend.key.height = unit(.3, "cm"),
+    legend.key.height = unit(.4, "cm"),
     legend.background = element_rect(color=two_colors[2], fill=NA,
                                      linewidth=.5, linetype = 2),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold", lineheight = .5)
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold", lineheight = .8)
   )
 
 # GSW by time across relative humidity
@@ -395,16 +393,16 @@ ggplot(data = Li_data, aes(x=Time, y = gsw,
   )+
     guides(color=guide_legend(title="Date"))+
   theme(
-    text = element_text(size=24, family="mont"),
-    legend.title = element_text(size=24, family="mont", face="bold"),
-    legend.text = element_text(size=20, family="mont"),
+    text = element_text(size=16, family="mont"),
+    legend.title = element_text(size=16, family="mont", face="bold"),
+    legend.text = element_text(size=14, family="mont"),
     legend.position="right",
     legend.title.position = "top",
     legend.key.height = unit(.3, "cm"),
     legend.background = element_rect(color=two_colors[2], fill=NA,
                                      linewidth=.5, linetype = 2),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold", lineheight = .5)
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold", lineheight = .5)
   )
 
 # gsw by relative humidity across treatment groups
@@ -423,36 +421,35 @@ ggplot(data = Li_data, aes(x=rh_s, y = gsw,
                    Humidity Across Inoculation Treatment in Tomato", 50)
   )+
   theme(
-    text = element_text(size=24, family="mont"),
-    legend.title = element_text(size=24, family="mont", face="bold"),
-    legend.text = element_text(size=20, family="mont"),
+    text = element_text(size=16, family="mont"),
+    legend.title = element_text(size=16, family="mont", face="bold"),
+    legend.text = element_text(size=14, family="mont"),
     legend.position="inside",
     legend.title.position = "top",
     legend.position.inside=c(0.15,0.75),
     legend.key.height = unit(.3, "cm"),
     legend.background = element_rect(color=four_colors[3], fill=NA, 
                                      linewidth=.5, linetype = 2),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold", lineheight = .5)
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold", lineheight = .5)
   )
 
 # gsw by Minutes from Start
 ggplot(data = Li_data, aes(x=MinutesFromStart, y = gsw, color = rh_s)) +
   geom_point()+
   scale_color_scico(begin=0.9, end=0, palette=a_palette)+
-  facet_wrap(~Treatment)+
   theme_bw()+
   ylab("Stomatal Conductance (mol m-2 s-1)")+
   xlab("Minutes From Start")+
   labs(
-    title=str_wrap("Stomatal Conductance by Minutes From Start Across Inoculation Treatment in Tomato", 50)
+    title=str_wrap("Stomatal Conductance by Minutes From Start Across Relative Humidity in Tomato", 40)
   )+
       guides(color=guide_colorbar(title=str_wrap("Relative Humidity", 8)))+
   theme(
-    text = element_text(size=24, family="mont"),
+    text = element_text(size=16, family="mont"),
     legend.position="right",
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold", lineheight = .5)
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold", lineheight = .8)
   )
 ```
 
@@ -480,8 +477,11 @@ gsw_glmm_rhs_pseudoR2 <- (gsw_glmm_rhs_summary$null.deviance -
                         gsw_glmm_rhs_summary$deviance)/gsw_glmm_rhs_summary$null.deviance
 print(gsw_glmm_rhs_pseudoR2)
 
+comps <- glht(gsw_glm_rhs, linfct = mcp(Treatment = "Tukey"))
+cld(comps)
+
 # PREDICTIONS
-  ## im going to do this in maybe the worst possible way, sorry
+  ## im going to do this in maybe the worst way possible, sorry
 
 # GSW_RHS
 ## initialize prediction plot
@@ -520,16 +520,20 @@ for (x in treatment_order) {
 p <- p +
   scale_color_scico_d(begin=0.9, end=0, palette=a_palette)+
   scale_fill_scico_d(begin=0.9, end=0, palette=a_palette)+
-  facet_wrap(~Treatment)+
+#  facet_wrap(~Treatment)+
   labs(title = "Real vs Predicted for gsw_rhs glm")+
   ylab("Stomatal Conductance (mol+1 m-2 s-1)")+
   xlab("Relative Humidity (%)")+
+  ylim(0,2)+
   theme_minimal()+
   theme(
-    text = element_text(size=24, family="mont"),
-    legend.position="none",
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold", lineheight = .5)
+    text = element_text(size=16, family="mont"),
+    legend.position="inside",
+    legend.position.inside = c(.15,.75),
+    legend.background = element_rect(color=four_colors[3], fill=NA, 
+                                     linewidth=.5, linetype = 2),
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold", lineheight = .5)
   )
 
 print(p)
@@ -578,10 +582,10 @@ p <- p +
   xlab("Days From Germination")+
   theme_minimal()+
   theme(
-    text = element_text(size=24, family="mont"),
+    text = element_text(size=16, family="mont"),
     legend.position="none",
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold", lineheight = .5)
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold", lineheight = .5)
   )
 
 print(p)
@@ -614,48 +618,54 @@ ggplot(data = Li_data, aes(x=DaysFromGermination, y = PhiPS2, color = Treatment)
   )+
       guides(color=guide_legend(title=str_wrap("Treatment", 8)))+
   theme(
-    text = element_text(size=24, family="mont"),
+    text = element_text(size=16, family="mont"),
     legend.position="right",
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold", lineheight = .5)
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold", lineheight = .5)
   )
 # PhiPS2 by Minutes from Start colored by treatment
-ggplot(data = Li_data, aes(x=MinutesFromStart, y = PhiPS2, color = Treatment)) +
+ggplot(data = Li_data, aes(x=MinutesFromStart, y = PhiPS2, color = Treatment, shape = Treatment, fill = Treatment)) +
   geom_point()+
-  scale_color_scico_d(begin=0.9, end=0, palette=a_palette)+
+  scale_color_manual(values=four_colors)+
+  scale_shape_manual(values=four_shapes)+
+  scale_fill_manual(values=four_colors)+
   theme_bw()+
   ylab("PhiPS2")+
   xlab("Minutes From Start")+
   labs(
-    title=str_wrap("Li-600 Photosystem II Efficiency by Minutes From Start Across Inoculation Treatment in Tomato", 50)
+    title=str_wrap("Li-600 Photosystem II Efficiency by Minutes From Start Across Inoculation Treatment in Tomato", 40)
   )+
       guides(color=guide_legend(title=str_wrap("Treatment", 8)))+
   theme(
-    text = element_text(size=24, family="mont"),
-    legend.position="right",
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold", lineheight = .5)
+    text = element_text(size=16, family="mont"),
+    legend.title = element_text(size=16, family="mont", face="bold"),
+    legend.text = element_text(size=14, family="mont"),
+    legend.key.height = unit(.3, "cm"),
+    legend.background = element_rect(color=four_colors[3], fill=NA, 
+                                     linewidth=.5, linetype = 2),
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold", lineheight = .8)
   )
 
 
 ## logitPS2 by Treatment boxplot
 ggplot(data = Li_data, aes(x= Treatment, y = logitPS2, fill=Treatment, color=Treatment)) +
-  geom_boxplot(alpha=.5, width=0.3, outliers = FALSE)+
-    geom_jitter( width=.05, height=0)+
+  geom_boxplot(alpha=.5, width=0.5, outliers = FALSE)+
+    geom_jitter( width=.15, height=0)+
 #    stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans")), size=8, family="mont")+
 #  stat_compare_means(label.x=3, label.y=3.5, size=8,family="mont")+
   scale_fill_manual(values=four_colors)+
   scale_color_manual(values=four_colors)+
   labs(
-    title=str_wrap("Li-600 LogitPS2 Across Inoculation Treatments in Tomato", 40)
+    title=str_wrap("Li-600 Logit PhiPS2 Across Inoculation Treatments in Tomato", 40)
   ) +
   ylab("Logit PhiPS2")+
   theme_bw()+
   theme(
     legend.position="none",
-    text = element_text(size=24, family="mont", lineheight=0.5),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
+    text = element_text(size=16, family="mont", lineheight=0.8),
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold")
   )
 
 # Mean logitPS2 per plant by Treatment boxplot 
@@ -668,15 +678,15 @@ ggplot(data = Li_data_stats_byplant, aes(x= Treatment, y = logitPS2_mean, fill=T
   scale_color_manual(values=four_colors)+
   labs(
     title=str_wrap("Li-600 Mean Logit PhiPS2 Per Plant
-                   Across Inoculation Treatments in Tomato", 60)
+                   Across Inoculation Treatments in Tomato", 40)
   ) +
   ylab("Logit PhiPS2")+
   theme_bw()+
   theme(
     legend.position="none",
-    text = element_text(size=24, family="mont", lineheight=0.5),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
+    text = element_text(size=16, family="mont", lineheight=0.8),
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold")
   )
 
 # MultispeQ
@@ -686,7 +696,7 @@ multiPDF_Z(subset(m_data$logitPS2, m_data$logitPS2>0),
 multiCDF_Z(subset(m_data$logitPS2, m_data$logitPS2>0),
               100, c('normal','lognormal','gamma'), a_palette, "Logit PhiPS2")
 multiKS_cont(subset(m_data$logitPS2, m_data$logitPS2>0),
-             c('normal','lognormal','gamma'))
+             c('normal','lognormal','gamma', 'exponential'))
 
 # check for heteroscedasticity
 leveneTest(m_data$logitPS2~m_data$Treatment)
@@ -705,14 +715,14 @@ ggplot(data = m_data, aes(x=DaysFromGermination, y = logitPS2,
                    Inoculation Treatment in Tomato", 50)
   )+
   theme(
-    text = element_text(size=24, family="mont"),
-    legend.title = element_text(size=24, family="mont", face="bold"),
-    legend.text = element_text(size=20, family="mont"),
+    text = element_text(size=16, family="mont"),
+    legend.title = element_text(size=16, family="mont", face="bold"),
+    legend.text = element_text(size=14, family="mont"),
     legend.key.height = unit(.3, "cm"),
     legend.background = element_rect(color=four_colors[3], fill=NA, 
                                      linewidth=.5, linetype = 2),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold", lineheight = .5)
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold", lineheight = .5)
   )
 
 ggplot(data = m_data, aes(x=MinutesFromStart, y = logitPS2, 
@@ -725,18 +735,18 @@ ggplot(data = m_data, aes(x=MinutesFromStart, y = logitPS2,
   ylab("Logit PhiPS2")+
   xlab("Minutes From Start")+
   labs(
-    title=str_wrap("MultispeQ Logit Photosystem II Efficiency By Minutes From Start Across
-                   Inoculation Treatment in Tomato", 50)
+    title=str_wrap("MultispeQ Logit PhiPS2 By Minutes From Start Across
+                   Inoculation Treatment in Tomato", 40)
   )+
   theme(
-    text = element_text(size=24, family="mont"),
-    legend.title = element_text(size=24, family="mont", face="bold"),
-    legend.text = element_text(size=20, family="mont"),
+    text = element_text(size=16, family="mont"),
+    legend.title = element_text(size=16, family="mont", face="bold"),
+    legend.text = element_text(size=14, family="mont"),
     legend.key.height = unit(.3, "cm"),
     legend.background = element_rect(color=four_colors[3], fill=NA, 
                                      linewidth=.5, linetype = 2),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold", lineheight = .5)
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold", lineheight = .8)
   )
 
 ## logitPS2 by Treatment boxplot
@@ -754,9 +764,9 @@ ggplot(data = m_data, aes(x= Treatment, y = logitPS2, fill=Treatment, color=Trea
   theme_bw()+
   theme(
     legend.position="none",
-    text = element_text(size=24, family="mont", lineheight=0.5),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
+    text = element_text(size=16, family="mont", lineheight=0.8),
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold")
   )
 # Mean logitPS2 per plant by Treatment boxplot 
 ggplot(data = m_data_stats_byplant, aes(x= Treatment, y = logitPS2_mean, fill=Treatment, color=Treatment)) +
@@ -768,15 +778,15 @@ ggplot(data = m_data_stats_byplant, aes(x= Treatment, y = logitPS2_mean, fill=Tr
   scale_color_manual(values=four_colors)+
   labs(
     title=str_wrap("MultispeQ Mean Logit PhiPS2 Per Plant
-                   Across Inoculation Treatments in Tomato", 50)
+                   Across Inoculation Treatments in Tomato", 40)
   ) +
   ylab("Mean Logit PhiPS2")+
   theme_bw()+
   theme(
     legend.position="none",
-    text = element_text(size=24, family="mont", lineheight=0.5),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
+    text = element_text(size=16, family="mont", lineheight=0.8),
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold")
   )
 
 ## PhiPS2 by date, grouped by treatment
@@ -787,7 +797,6 @@ ggplot(data = Li_data, aes(x=as.factor(Date), y = PhiPS2, color = Treatment,
   scale_shape_manual(values=four_shapes)+
   scale_fill_manual(values=four_colors)+
   scale_x_discrete(guide=guide_axis(check.overlap=TRUE))+
-  ylim(.6,.8)+
   facet_wrap(~Treatment)+
   theme_bw()+
   ylab("PhiPS2")+
@@ -796,11 +805,11 @@ ggplot(data = Li_data, aes(x=as.factor(Date), y = PhiPS2, color = Treatment,
     title=str_wrap("PhiPS2 By Date Across Microbial Treatments in Tomato", 60)
   )+
   theme(
-    text = element_text(size=24, family="mont"),
+    text = element_text(size=16, family="mont"),
     legend.position="none",
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
     axis.text.x = element_text(size=12, family = "mont", angle=10),
-    title = element_text(size=30, family="open", face="bold", lineheight = .5)
+    title = element_text(size=20, family="open", face="bold", lineheight = .5)
   )
 
 # PhiPS2 by leaf across temperature
@@ -817,21 +826,62 @@ ggplot(data = Li_data, aes(x=Date, y = PhiPS2, color = Tleaf)) +
     title=str_wrap("PhiPS2 By Date Across Temperature in Tomato", 50)
   )+
   theme(
-    text = element_text(size=24, family="mont"),
-    legend.title = element_text(size=24, family="mont", face="bold"),
-    legend.text = element_text(size=20, family="mont"),
+    text = element_text(size=16, family="mont"),
+    legend.title = element_text(size=16, family="mont", face="bold"),
+    legend.text = element_text(size=14, family="mont"),
     legend.position="inside",
     legend.title.position = "top",
     legend.position.inside=c(0.75,0.2),
     legend.key.height = unit(.3, "cm"),
    legend.background = element_rect(color=two_colors[2], 
                                     fill=NA, linewidth=.5, linetype = 2),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold", lineheight = .5)
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold", lineheight = .5)
   )
 
 # compare Li-600 and MultispeQ - PhiPS2
-ggplot(       )
+## get mean and sd ps2 at each treatment and each date
+Li_ps2_means <- Li_data %>%
+  group_by(Treatment, Date) %>%
+  summarize_at(vars(logitPS2), list(mean=mean, median=median, sd=sd))
+
+m_ps2_means <- m_data %>%
+  group_by(Treatment, Date) %>%
+  summarize_at(vars(logitPS2), list(mean=mean, median=median, sd=sd))
+
+m_ps2_means <- m_ps2_means %>%
+  filter(Date %in% Li_ps2_means$Date) %>%
+  subset(as.character(Date) != "2024-07-09")
+
+Li_ps2_means <- Li_ps2_means %>%
+  filter(Date %in% m_ps2_means$Date) %>%
+  subset(as.character(Date) != "2024-07-09")
+
+Li_ps2_means$m_mean <- m_ps2_means$mean
+Li_ps2_means$m_median <- m_ps2_means$median
+Li_ps2_means$m_sd <- m_ps2_means$sd
+
+ggplot(Li_ps2_means, aes(x=median, y=m_median, color=Treatment, shape=Treatment, fill=Treatment))+
+  geom_point(size = 4)+
+  geom_errorbar(aes(ymin = m_median - m_sd, ymax = m_median + m_sd))+
+  geom_errorbarh(aes(xmin = median - sd, xmax = median + sd))+
+  facet_wrap(~Treatment)+
+  scale_color_manual(values=four_colors)+
+  scale_shape_manual(values=four_shapes)+
+  scale_fill_manual(values=four_colors)+
+  theme_bw()+
+  ylab("MultispeQ Median Logit PhiPS2 per Date")+
+  xlab("Li-600 median Logit PhiPS2 per Date")+
+    labs(
+    title=str_wrap("Median Logit PhiPS2 for Two Devices Grouped by Treatment and Date across Inoculation Treatments in Tomato", 40)
+  )+
+  theme(
+    text = element_text(size=16, family="mont"),
+    legend.position="none",
+    legend.title.position = "top",
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold", lineheight = .8)
+  )
 
 ```
 
@@ -866,7 +916,6 @@ mod_Phi2_qamb_Mult_s <- summary(mod_Phi2_qamb_Mult <- (lm(
   data = m_data)))
 print(mod_Phi2_qamb_Mult_s)
 ## R2 0.5065
-
 
 # run and plot predictions
 
@@ -909,10 +958,10 @@ labs(title = "Real vs Predicted for Li-600 logitPS2 ~ Treatment + Qamb")+
   xlab("Ambient Light (lumens)")+
   theme_minimal()+
   theme(
-    text = element_text(size=24, family="mont"),
+    text = element_text(size=16, family="mont"),
     legend.position="right",
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold", lineheight = .5)
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold", lineheight = .5)
   )
 
 print(p)
@@ -957,10 +1006,10 @@ labs(title = "Real vs Predicted for Li-600 logitPS2 ~ Treatment + DaysFromGermin
   xlab("Days From Germination")+
   theme_minimal()+
   theme(
-    text = element_text(size=24, family="mont"),
+    text = element_text(size=16, family="mont"),
     legend.position="right",
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold", lineheight = .5)
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold", lineheight = .5)
   )
 
 print(p)
@@ -1004,10 +1053,10 @@ labs(title = "Real vs Predicted for MultispeQ logitPS2 ~ Treatment + DaysFromGer
   xlab("Days From Germination")+
   theme_minimal()+
   theme(
-    text = element_text(size=24, family="mont"),
+    text = element_text(size=16, family="mont"),
     legend.position="right",
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold", lineheight = .5)
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold", lineheight = .5)
   )
 
 print(p)
@@ -1051,10 +1100,10 @@ labs(title = "Real vs Predicted for MultispeQ logitPS2 ~ Treatment + Light")+
   xlab("Light Intensity (PAR)")+
   theme_minimal()+
   theme(
-    text = element_text(size=24, family="mont"),
+    text = element_text(size=16, family="mont"),
     legend.position="right",
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold", lineheight = .5)
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold", lineheight = .5)
   )
 
 print(p)
@@ -1069,10 +1118,52 @@ multiPDF_Z(subset(m_data$logitFvPFmP, m_data$logitFvPFmP > 0),
               100, c('normal','lognormal','gamma'), a_palette, "FvP/FmP")
 multiCDF_Z(subset(m_data$logitFvPFmP, m_data$logitFvPFmP > 0),
               100, c('normal','lognormal','gamma'), a_palette, "FvP/FmP")
-multiKS_cont(subset(m_data$logitFvPFmP, m_data$logitFvPFmP > 0),
-             c('normal','lognormal','gamma'))
+multiKS_cont(subset(m_data$logitFvPFmP, m_data$logitFvPFmP > 0), "all")
 
 leveneTest(m_data$logitFvPFmP~m_data$Treatment)
+
+# fvp box
+ggplot(data = m_data, aes(x= Treatment, y = logitFvPFmP, fill=Treatment, color=Treatment)) +
+  geom_boxplot(alpha=.5, width=0.5, outliers = FALSE)+
+    geom_jitter( width=.15, height=0)+
+#    stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Germination", "Transplantation"), c("Germination", "Germ+Trans"), c("Transplantation", "Germ+Trans")), size=8, family="mont")+
+#  stat_compare_means(label.x=3, label.y=.8, size=8,family="mont")+
+  scale_fill_manual(values=four_colors)+
+  scale_color_manual(values=four_colors)+
+  labs(
+    title=str_wrap(" Logit Fv'/Fm'
+                   Across Inoculation Treatments in Tomato", 40)
+  ) +
+  ylab("Logit Fv'/Fm'")+
+  theme_bw()+
+  theme(
+    legend.position="none",
+    text = element_text(size=16, family="mont", lineheight=0.8),
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold")
+  )
+
+# fvp mean box
+ggplot(data = m_data_stats_byplant, aes(x= Treatment, y = logitFvPFmP_mean, fill=Treatment, color=Treatment)) +
+  geom_boxplot(alpha=.5, width=0.5, outliers = FALSE)+
+    geom_jitter( width=.15, height=0)+
+#    stat_compare_means(comparisons = list(c("Control","Germination"),c("Control", "Transplantation"), c("Control", "Germ+Trans"), c("Germination", "Transplantation"), c("Germination", "Germ+Trans"), c("Transplantation", "Germ+Trans")), size=8, family="mont")+
+#  stat_compare_means(label.x=3, label.y=.8, size=8,family="mont")+
+  scale_fill_manual(values=four_colors)+
+  scale_color_manual(values=four_colors)+
+  labs(
+    title=str_wrap("Mean Logit Fv'/Fm' per Plant
+                   Across Inoculation Treatments in Tomato", 40)
+  ) +
+  ylab("Mean Logit Fv'/Fm'")+
+  theme_bw()+
+  theme(
+    legend.position="none",
+    text = element_text(size=16, family="mont", lineheight=0.8),
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold")
+  )
+
 
 
 ggplot(data = m_data, aes(x=MinutesFromStart, y = logitFvPFmP, 
@@ -1090,15 +1181,15 @@ ggplot(data = m_data, aes(x=MinutesFromStart, y = logitFvPFmP,
                    Inoculation Treatment in Tomato", 50)
   )+
   theme(
-    text = element_text(size=24, family="mont"),
+    text = element_text(size=16, family="mont"),
     legend.position = "none",
-    legend.title = element_text(size=24, family="mont", face="bold"),
-    legend.text = element_text(size=20, family="mont"),
+    legend.title = element_text(size=16, family="mont", face="bold"),
+    legend.text = element_text(size=14, family="mont"),
     legend.key.height = unit(.3, "cm"),
     legend.background = element_rect(color=four_colors[3], fill=NA, 
                                      linewidth=.5, linetype = 2),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold", lineheight = .5)
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold", lineheight = .5)
   )
 ```
 
@@ -1136,6 +1227,40 @@ print(mod_FvP_lm_s)
 ## R2 0.06926
 
 
+mod_FvP_all_s <- summary(mod_FvP_all<- (lm(
+  logitFvPFmP ~ Treatment + Light.Intensity..PAR. + MinutesFromStart + DaysFromGermination,
+  data = m_data)))
+print(mod_FvP_all_s)
+## R2 0.1304
+
+mod_FvP_s <- summary(mod_FvP<- (lm(
+  logitFvPFmP ~ Treatment,
+  data = m_data)))
+print(mod_FvP_s)
+
+summary(glht(mod_FvP, linfct = mcp(Treatment="Tukey")))
+summary(glht(mod_FvP_all, linfct = mcp(Treatment="Tukey")))
+
+# fvp mean box
+ggplot(data = m_data_stats_byplant, aes(x= Treatment, y = logitFvPFmP_mean, fill=Treatment, color=Treatment)) +
+  geom_boxplot(alpha=.5, width=0.5, outliers = FALSE)+
+    geom_jitter( width=.15, height=0)+
+  scale_fill_manual(values=four_colors)+
+  scale_color_manual(values=four_colors)+
+  labs(
+    title=str_wrap("Mean Logit Fv'/Fm' per Plant
+                   Across Inoculation Treatments in Tomato", 40)
+  ) +
+  ylab("Mean Logit Fv'/Fm'")+
+  annotate("text", x=1:4, y=1.2, label = c("a", "b", "c", "a"), size=5, family="open")+
+  theme_bw()+
+  theme(
+    legend.position="none",
+    text = element_text(size=16, family="mont", lineheight=0.8),
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold")
+  )
+
 ```
 
 ## 3.2 Fruit
@@ -1165,9 +1290,9 @@ ggplot(data=Fl_data_no_BER, aes(x=Treatment, y=mass, color=Treatment, fill=Treat
   )+
   theme(
     legend.position="none",
-    text = element_text(size=24, family="mont", face="bold"),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
+    text = element_text(size=16, family="mont", face="bold"),
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold")
   )
 
 ## plot of mass mean per plant by treatment with box plots and jittered points
@@ -1181,13 +1306,13 @@ ggplot(data=Fl_means_byplant, aes(x=Treatment, y=mass_mean, color=Treatment, fil
   theme_bw()+
   #facet_wrap(~Treatment)+
   labs(
-    title=str_wrap("Mean Tomato Mass Per Plant across Treatments", 50)
+    title=str_wrap("Mean Tomato Mass Per Plant across Treatments", 40)
   )+
   theme(
     legend.position="none",
-    text = element_text(size=24, family="mont", face="bold", lineheight=0.5),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
+    text = element_text(size=16, family="mont", face="bold", lineheight=0.8),
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold")
   )
 
 
@@ -1248,9 +1373,9 @@ ggplot(data=Fl_data_no_BER, aes(x=Treatment, y=sugar_avg, color=Treatment, fill=
   )+
   theme(
     legend.position="none",
-    text = element_text(size=24, family="mont", face="bold", lineheight=0.5),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
+    text = element_text(size=16, family="mont", face="bold", lineheight=0.5),
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold")
   )
 
 ## plot sugar means per plant by treatment as a boxplot with violins and jitter
@@ -1268,9 +1393,9 @@ ggplot(data=Fl_means_byplant, aes(x=Treatment, y=sugar_avg_mean, color=Treatment
   )+
   theme(
     legend.position="none",
-    text = element_text(size=24, family="mont", face="bold", lineheight=0.5),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
+    text = element_text(size=16, family="mont", face="bold", lineheight=0.8),
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold")
   )
 
 ## scatter plot of sugar by mass grouped and facet wrapped by treatment
@@ -1290,9 +1415,9 @@ ggplot(data=Fl_data_no_BER, aes(x=mass, y=sugar_avg,
   )+
   theme(
     legend.position="none",
-    text = element_text(size=24, family="mont", face="bold"),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
+    text = element_text(size=16, family="mont", face="bold"),
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold")
   )
 
 
@@ -1311,10 +1436,14 @@ print(mod_sug_g_s)
 
 
 # Grouped Gamma glm
-mod_sugG_g_s <- summary(mod_sug_g <- glm(sugar_avg_mean ~ Treatment, data = Fl_means_byplant,
+mod_sugG_g_s <- summary(mod_sugG_g <- glm(sugar_avg_mean ~ Treatment, data = Fl_means_byplant,
                                         family = Gamma(link = "log")))
 print(mod_sugG_g_s)
+(mod_sugG_g_s$null.deviance - mod_sugG_g_s$deviance)/mod_sugG_g_s$null.deviance
 
+comps <- glht(mod_sugG_g, linfct=mcp(Treatment = "Tukey"))
+summary(glht(mod_sugG_g, linfct=mcp(Treatment = "Tukey")))
+cld(comps)
 
 ```
 
@@ -1340,9 +1469,9 @@ ggplot(data=Fl_data_no_BER, aes(x=DaysFromHarvestToAnalysis, y=ripeness,
   )+
   theme(
     legend.position="right",
-    text = element_text(size=24, family="mont", face="bold"),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
+    text = element_text(size=16, family="mont", face="bold"),
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold")
   )
 
 ## scatter plot of sugar by days from harvest to analysis grouped by treatment (exploratory, to see how delayed analysis may affect sugar content [hopefully it doesn't])
@@ -1362,15 +1491,14 @@ ggplot(data=Fl_data_no_BER, aes(x=DaysFromHarvestToAnalysis, y=sugar_avg,
   )+
   theme(
     legend.position="right",
-    text = element_text(size=24, family="mont", face="bold"),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
+    text = element_text(size=16, family="mont", face="bold"),
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold")
   )
 ```
 
 ### 3.3.2 Harvest analysis
 
-do tests n shit
 ```{r harvest_analysis}
 
 ## probability of BER for each mass bin
@@ -1386,9 +1514,9 @@ ggplot(data=Fl_data_mb, aes(x=mass_bin, y=pBER*100, fill=mass_bin))+
   )+
   theme(
     legend.position="none",
-    text = element_text(size=24, family="mont", face="bold"),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
+    text = element_text(size=16, family="mont", face="bold"),
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold")
   )
 
 ## Plot probability of blossom end rot by treatment as a column graph
@@ -1403,8 +1531,8 @@ ggplot(data=Fl_data_summary, aes(x=Treatment, y=pBER*100, fill=Treatment))+
   )+
   theme(
     legend.position="none",
-    text = element_text(size=30, family="mont", face="bold"),
-    axis.title = element_text(size=30, family = "mont", face= "bold"),
+    text = element_text(size=20, family="mont", face="bold"),
+    axis.title = element_text(size=20, family = "mont", face= "bold"),
     title = element_text(size=34, family="open", face="bold")
   )
 
@@ -1420,8 +1548,8 @@ ggplot(data=Fl_data_summary, aes(x=Treatment, y=fruit_sum, fill=Treatment))+
   )+
   theme(
     legend.position="none",
-    text = element_text(size=30, family="mont", face="bold"),
-    axis.title = element_text(size=30, family = "mont", face= "bold"),
+    text = element_text(size=20, family="mont", face="bold"),
+    axis.title = element_text(size=20, family = "mont", face= "bold"),
     title = element_text(size=34, family="open", face="bold")
   )
 
@@ -1440,9 +1568,9 @@ ggplot(data=Fl_data, aes(x=Treatment, y=Fl_data[order(Fl_data$BER),]$fruit, fill
     legend.position="right",
       legend.background = element_rect(color=four_colors[3], fill=NA, 
                                      linewidth=.5, linetype = 2),
-    text = element_text(size=24, family="mont", face="bold"),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
+    text = element_text(size=16, family="mont", face="bold"),
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold")
   )
 
 ## Plot blossom end rot by mass bin as a stacked bar chart
@@ -1461,11 +1589,11 @@ ggplot(data=Fl_data, aes(x=mass_bin, y=Fl_data[order(Fl_data$BER),]$fruit, fill=
     legend.position.inside=c(.8,.7),
     legend.background = element_rect(color=four_colors[3], fill=NA, 
                                      linewidth=.5, linetype = 2),
-    text = element_text(size=24, family="mont", face="bold", lineheight=0.5),
-    axis.text.x = element_text(size=20, family = "mont", angle=45, 
+    text = element_text(size=16, family="mont", face="bold", lineheight=0.5),
+    axis.text.x = element_text(size=14, family = "mont", angle=45, 
                                lineheight=1, hjust=1, vjust=1.3),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold")
   )
 
 ## Plot blossom end rot by plant as a stacked bar chart
@@ -1484,11 +1612,11 @@ ggplot(data=Fl_data, aes(x=plant, y=Fl_data[order(Fl_data$BER),]$fruit, fill=BER
     legend.position="right",
     legend.background = element_rect(color=four_colors[3], fill=NA, 
                                      linewidth=.5, linetype = 2),
-    text = element_text(size=24, family="mont", face="bold", lineheight=0.5),
+    text = element_text(size=16, family="mont", face="bold", lineheight=0.5),
     axis.text = element_text(size=16, family = "mont", 
                                lineheight=1),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold")
     )
 
 ## fruit mass sum by treatment
@@ -1504,9 +1632,9 @@ ggplot(data=Fl_data_summary, aes(x=Treatment, y=mass_sum/1000,
   )+
   theme(
     legend.position="none",
-    text = element_text(size=24, family="mont", face="bold"),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
+    text = element_text(size=16, family="mont", face="bold"),
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold")
   )
 
 ## fruit mass sum by plant
@@ -1524,9 +1652,9 @@ ggplot(data=Fl_sum_byplant, aes(x=plant, y=mass_sum/1000,
   )+
   theme(
     legend.position="none",
-    text = element_text(size=24, family="mont", face="bold"),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
+    text = element_text(size=16, family="mont", face="bold"),
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold")
   )
 
 ## plot of fruit mass by treatment
@@ -1544,52 +1672,56 @@ ggplot(data=Fl_sum_byplant, aes(x=Treatment, y=mass_sum/1000, color=Treatment, f
   )+
   theme(
     legend.position="none",
-    text = element_text(size=24, family="mont", face="bold"),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
+    text = element_text(size=16, family="mont", face="bold"),
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold")
   )
 
 ## plot of fruit count by treatment
 ggplot(data=Fl_sum_byplant, aes(x=Treatment, y=fruit_sum, color=Treatment, fill=Treatment))+
-  geom_violin(alpha=0.5)+
-  geom_boxplot(width=0.2, alpha=0.5, outliers = FALSE)+
-  geom_jitter(width=0.1)+
+  geom_boxplot(width=0.3, alpha=0.5, outliers = FALSE)+
+  geom_jitter(width=0.15)+
     scale_fill_manual(values=four_colors)+
     scale_color_manual(values=four_colors)+
   ylab("Fruit Count")+
   xlab("Treatment")+
   theme_bw()+
   labs(
-    title="Tomato Plant Harvested Fruit Count Across Inoculation Treatments"
+    title="Fruit Count Per Plant Across Treatments"
   )+
   theme(
     legend.position="none",
-    text = element_text(size=24, family="mont", face="bold"),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
+    text = element_text(size=16, family="mont", face="bold"),
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold")
   )
 
-Fl_avg_sums <- Fl_sum_byplant %>%
-  group_by(Treatment) %>%
-  summarize_at(vars(mass_sum), list(mean=mean, sd=sd))%>%
-  mutate(mean=mean/1000,
-         sd=sd/1000)
+fca <- aov(fruit_sum~Treatment, data= Fl_sum_byplant)
+summary(fca)
 
-## mass per treatment columns with error bars
-ggplot(data=Fl_avg_sums, aes(x=Treatment, y=mean, fill=Treatment))+
-  geom_col()+
-  geom_errorbar( aes(ymin=mean-sd, ymax=mean+sd), width=0.4)+
-  scale_fill_manual(values=four_colors)+
-  ylab("Total Mass (kg)")+
+fckw <- kruskal.test(fruit_sum~Treatment, data= Fl_sum_byplant)
+
+## plot of blossom-end rot by treatment - boxplot
+ggplot(data=Fl_sum_byplant, aes(x=Treatment, y=pBER*100, color=Treatment, fill=Treatment))+
+  geom_boxplot(width=0.3, alpha=0.5, outliers = FALSE)+
+  geom_jitter(width=0.15)+
+    scale_fill_manual(values=four_colors)+
+    scale_color_manual(values=four_colors)+
+  ylab("Percent of Fruit w/ BER")+
   xlab("Treatment")+
-    labs(
-    title="Total Tomato Fruit Mass (kg) Across Inoculation Treatments"
-  )+
   theme_bw()+
+  labs(
+    title=str_wrap("Percent Blossom End Rot for Each Plant Across Treatments", 40)
+  )+
   theme(
     legend.position="none",
-    text = element_text(size=24, family="mont", face="bold"),
-    axis.title = element_text(size=24, family = "mont", face= "bold"),
-    title = element_text(size=30, family="open", face="bold")
+    text = element_text(size=16, family="mont", face="bold"),
+    axis.title = element_text(size=16, family = "mont", face= "bold"),
+    title = element_text(size=20, family="open", face="bold")
   )
+
+mod_ber_s <- summary(mod_ber <- lm(pBER ~ Treatment, data = Fl_sum_byplant))
+print(mod_ber_s)
+
+
 ```
